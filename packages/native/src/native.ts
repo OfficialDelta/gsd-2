@@ -94,4 +94,9 @@ export const native = loadNative() as {
   ttsrCompileRules: (rules: unknown[]) => number;
   ttsrCheckBuffer: (handle: number, buffer: string) => string[];
   ttsrFreeRules: (handle: number) => void;
+  parseFrontmatter: (content: string) => unknown;
+  extractSection: (content: string, heading: string, level?: number) => unknown;
+  extractAllSections: (content: string, level?: number) => string;
+  batchParseGsdFiles: (directory: string) => unknown;
+  parseRoadmapFile: (content: string) => unknown;
 };

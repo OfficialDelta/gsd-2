@@ -93,3 +93,19 @@ export type { NativeImageHandle } from "./image/index.js";
 
 export { ttsrCompileRules, ttsrCheckBuffer, ttsrFreeRules } from "./ttsr/index.js";
 export type { TtsrHandle, TtsrRuleInput } from "./ttsr/index.js";
+export {
+  parseFrontmatter,
+  extractSection as nativeExtractSection,
+  extractAllSections,
+  batchParseGsdFiles,
+  parseRoadmapFile,
+} from "./gsd-parser/index.js";
+export type {
+  BatchParseResult,
+  FrontmatterResult,
+  NativeBoundaryMapEntry,
+  NativeRoadmap,
+  NativeRoadmapSlice,
+  ParsedGsdFile,
+  SectionResult,
+} from "./gsd-parser/index.js";

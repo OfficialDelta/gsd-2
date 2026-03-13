@@ -21,4 +21,5 @@ mod ps;
 mod task;
 mod text;
 mod ttsr;
+mod gsd_parser;
 mod image;

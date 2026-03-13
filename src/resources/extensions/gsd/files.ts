@@ -19,6 +19,7 @@ import type {
 
 import { checkExistingEnvKeys } from '../get-secrets-from-user.ts';
 import { parseRoadmapSlices } from './roadmap-slices.ts';
+import { nativeParseRoadmap, nativeExtractSection, NATIVE_UNAVAILABLE } from './native-parser-bridge.ts';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -130,6 +131,10 @@ export function parseFrontmatterMap(lines: string[]): Record<string, unknown> {
 
 /** Extract the text after a heading at a given level, up to the next heading of same or higher level. */
 export function extractSection(body: string, heading: string, level: number = 2): string | null {
+  // Try native parser first for better performance on large files
+  const nativeResult = nativeExtractSection(body, heading, level);
+  if (nativeResult !== NATIVE_UNAVAILABLE) return nativeResult as string | null;
+
   const prefix = '#'.repeat(level) + ' ';
   const regex = new RegExp(`^${prefix}${escapeRegex(heading)}\\s*$`, 'm');
   const match = regex.exec(body);
@@ -182,6 +187,10 @@ export function extractBoldField(text: string, key: string): string | null {
 // ─── Roadmap Parser ────────────────────────────────────────────────────────
 
 export function parseRoadmap(content: string): Roadmap {
+  // Try native parser first for better performance
+  const nativeResult = nativeParseRoadmap(content);
+  if (nativeResult) return nativeResult;
+
   const lines = content.split('\n');
 
   const h1 = lines.find(l => l.startsWith('# '));
