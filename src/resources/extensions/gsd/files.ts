@@ -22,6 +22,34 @@ import { checkExistingEnvKeys } from '../get-secrets-from-user.js';
 import { parseRoadmapSlices } from './roadmap-slices.js';
 import { nativeParseRoadmap, nativeExtractSection, NATIVE_UNAVAILABLE } from './native-parser-bridge.js';
 
+// ─── Parse Cache ──────────────────────────────────────────────────────────
+
+const CACHE_MAX = 50;
+
+/** Fast composite key: length + first/last 100 chars. Unique enough for distinct markdown files. */
+function cacheKey(content: string): string {
+  const len = content.length;
+  const head = content.slice(0, 100);
+  const tail = len > 100 ? content.slice(-100) : '';
+  return `${len}:${head}:${tail}`;
+}
+
+const _parseCache = new Map<string, unknown>();
+
+function cachedParse<T>(content: string, tag: string, parseFn: (c: string) => T): T {
+  const key = tag + '|' + cacheKey(content);
+  if (_parseCache.has(key)) return _parseCache.get(key) as T;
+  if (_parseCache.size >= CACHE_MAX) _parseCache.clear();
+  const result = parseFn(content);
+  _parseCache.set(key, result);
+  return result;
+}
+
+/** Clear the module-scoped parse cache. Call when files change on disk. */
+export function clearParseCache(): void {
+  _parseCache.clear();
+}
+
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 /**
@@ -188,6 +216,10 @@ export function extractBoldField(text: string, key: string): string | null {
 // ─── Roadmap Parser ────────────────────────────────────────────────────────
 
 export function parseRoadmap(content: string): Roadmap {
+  return cachedParse(content, 'roadmap', _parseRoadmapImpl);
+}
+
+function _parseRoadmapImpl(content: string): Roadmap {
   // Try native parser first for better performance
   const nativeResult = nativeParseRoadmap(content);
   if (nativeResult) return nativeResult;
@@ -210,7 +242,7 @@ export function parseRoadmap(content: string): Roadmap {
     })();
   const successCriteria = scSection ? parseBullets(scSection) : [];
 
-  // Slices  
+  // Slices
   const slices = parseRoadmapSlices(content);
 
   // Boundary map
@@ -318,6 +350,10 @@ export function formatSecretsManifest(manifest: SecretsManifest): string {
 // ─── Slice Plan Parser ─────────────────────────────────────────────────────
 
 export function parsePlan(content: string): SlicePlan {
+  return cachedParse(content, 'plan', _parsePlanImpl);
+}
+
+function _parsePlanImpl(content: string): SlicePlan {
   const lines = content.split('\n');
 
   const h1 = lines.find(l => l.startsWith('# '));
@@ -396,6 +432,10 @@ export function parsePlan(content: string): SlicePlan {
 // ─── Summary Parser ────────────────────────────────────────────────────────
 
 export function parseSummary(content: string): Summary {
+  return cachedParse(content, 'summary', _parseSummaryImpl);
+}
+
+function _parseSummaryImpl(content: string): Summary {
   const [fmLines, body] = splitFrontmatter(content);
 
   const fm = fmLines ? parseFrontmatterMap(fmLines) : {};
@@ -460,6 +500,10 @@ export function parseSummary(content: string): Summary {
 // ─── Continue Parser ───────────────────────────────────────────────────────
 
 export function parseContinue(content: string): Continue {
+  return cachedParse(content, 'continue', _parseContinueImpl);
+}
+
+function _parseContinueImpl(content: string): Continue {
   const [fmLines, body] = splitFrontmatter(content);
 
   const fm = fmLines ? parseFrontmatterMap(fmLines) : {};
