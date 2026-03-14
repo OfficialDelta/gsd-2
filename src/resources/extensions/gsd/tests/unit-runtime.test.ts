@@ -8,6 +8,7 @@ import {
   readUnitRuntimeRecord,
   writeUnitRuntimeRecord,
 } from "../unit-runtime.ts";
+import { clearPathCache } from '../paths.ts';
 import { createTestContext } from './test-helpers.ts';
 
 const { assertEq, assertTrue, report } = createTestContext();
@@ -48,6 +49,7 @@ console.log("\n=== execute-task durability inspection ===");
     "utf-8",
   );
   writeFileSync(join(base, ".gsd", "STATE.md"), "## Next Action\nExecute T10 for S02: next thing\n", "utf-8");
+  clearPathCache();
 
   status = await inspectExecuteTaskDurability(base, "M100/S02/T09");
   assertEq(status!.summaryExists, true, "summary found after write");
@@ -128,6 +130,7 @@ console.log("\n=== must-haves: partially mentioned in summary ===");
   );
   writeFileSync(join(mhBase, ".gsd", "STATE.md"), "## Next Action\nExecute T02 for S02: next thing\n", "utf-8");
 
+  clearPathCache();
   const status = await inspectExecuteTaskDurability(mhBase, "M200/S02/T01");
   assertTrue(status !== null, "mh-partial: status exists");
   assertEq(status!.mustHaveCount, 3, "mh-partial: mustHaveCount is 3");
@@ -155,6 +158,7 @@ console.log("\n=== must-haves: no task plan file ===");
   );
   writeFileSync(join(mhBase, ".gsd", "STATE.md"), "## Next Action\nExecute T02 for S03: next thing\n", "utf-8");
 
+  clearPathCache();
   const status = await inspectExecuteTaskDurability(mhBase, "M200/S03/T01");
   assertTrue(status !== null, "mh-noplan: status exists");
   assertEq(status!.mustHaveCount, 0, "mh-noplan: mustHaveCount is 0 when no task plan");
@@ -179,6 +183,7 @@ console.log("\n=== must-haves: present but no summary file ===");
   );
   writeFileSync(join(mhBase, ".gsd", "STATE.md"), "## Next Action\nExecute T01 for S04: build parser\n", "utf-8");
 
+  clearPathCache();
   const status = await inspectExecuteTaskDurability(mhBase, "M200/S04/T01");
   assertTrue(status !== null, "mh-nosummary: status exists");
   assertEq(status!.mustHaveCount, 2, "mh-nosummary: mustHaveCount is 2");
@@ -210,6 +215,7 @@ console.log("\n=== must-haves: substring matching (no backtick tokens) ===");
   );
   writeFileSync(join(mhBase, ".gsd", "STATE.md"), "## Next Action\nExecute T02 for S05: next thing\n", "utf-8");
 
+  clearPathCache();
   const status = await inspectExecuteTaskDurability(mhBase, "M200/S05/T01");
   assertTrue(status !== null, "mh-substr: status exists");
   assertEq(status!.mustHaveCount, 3, "mh-substr: mustHaveCount is 3");

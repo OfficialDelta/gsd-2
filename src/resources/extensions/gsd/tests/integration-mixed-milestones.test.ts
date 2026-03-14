@@ -23,6 +23,7 @@ import {
   parseSliceBranch,
   switchToMain,
 } from '../worktree.ts';
+import { clearPathCache } from '../paths.ts';
 import { createTestContext } from './test-helpers.ts';
 
 // ─── Assertion Helpers ────────────────────────────────────────────────────
@@ -437,6 +438,7 @@ Built the legacy feature successfully.
 `);
       run('git add .', base);
       run('git commit -m add-m001', base);
+      clearPathCache();
 
       // M001 (seq=1) < M001-abc123 (seq=1) — but M001 has incomplete S02
       // Since M001 seq=1 and M002-abc123 seq=2, blocker should reference M001/S02
@@ -459,6 +461,7 @@ Built the legacy feature successfully.
 `);
       run('git add .', base);
       run('git commit -m complete-m001', base);
+      clearPathCache();
 
       assertEq(
         getPriorSliceCompletionBlocker(base, 'main', 'plan-slice', 'M002-abc123/S01'),
