@@ -7,6 +7,17 @@ on:
     branches: [main]
 
 jobs:
+  no-gsd-dir:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Ensure .gsd/ is not checked in
+        run: |
+          if [ -d ".gsd" ]; then
+            echo "::error::.gsd/ directory must not be checked in"
+            exit 1
+          fi
+
   build:
     runs-on: ubuntu-latest
 
