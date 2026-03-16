@@ -213,6 +213,7 @@ On first run, GSD launches a branded setup wizard that walks you through LLM pro
 | `/gsd next`             | Explicit step mode (same as bare `/gsd`)                        |
 | `/gsd auto`             | Autonomous mode — researches, plans, executes, commits, repeats |
 | `/gsd stop`             | Stop auto mode gracefully                                       |
+| `/gsd steer`            | Hard-steer plan documents during execution                      |
 | `/gsd discuss`          | Discuss architecture and decisions (works alongside auto mode)  |
 | `/gsd status`           | Progress dashboard                                              |
 | `/gsd queue`            | Queue future milestones (safe during auto mode)                 |
