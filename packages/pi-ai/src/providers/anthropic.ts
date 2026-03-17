@@ -1,4 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk";
+// Lazy-loaded: Anthropic SDK (~500ms) is imported on first use, not at startup.
+// This avoids penalizing users who don't use Anthropic models.
+import type Anthropic from "@anthropic-ai/sdk";
 import type {
 	ContentBlockParam,
 	MessageCreateParamsStreaming,
@@ -31,6 +33,15 @@ import { sanitizeSurrogates } from "../utils/sanitize-unicode.js";
 import { buildCopilotDynamicHeaders, hasCopilotVisionInput } from "./github-copilot-headers.js";
 import { adjustMaxTokensForThinking, buildBaseOptions } from "./simple-options.js";
 import { transformMessages } from "./transform-messages.js";
+
+let _AnthropicClass: typeof Anthropic | undefined;
+async function getAnthropicClass(): Promise<typeof Anthropic> {
+	if (!_AnthropicClass) {
+		const mod = await import("@anthropic-ai/sdk");
+		_AnthropicClass = mod.default;
+	}
+	return _AnthropicClass;
+}
 
 /**
  * Resolve cache retention preference.
@@ -265,7 +276,7 @@ export const streamAnthropic: StreamFunction<"anthropic-messages", AnthropicOpti
 				});
 			}
 
-			const { client, isOAuthToken } = createClient(
+			const { client, isOAuthToken } = await createClient(
 				model,
 				apiKey,
 				options?.interleavedThinking ?? true,
@@ -455,7 +466,8 @@ export const streamAnthropic: StreamFunction<"anthropic-messages", AnthropicOpti
 			if (model.provider === "alibaba-coding-plan") {
 				output.errorMessage = `[alibaba-coding-plan] ${output.errorMessage}`;
 			}
-			if (error instanceof Anthropic.APIError && error.headers) {
+			const AnthropicSdk = _AnthropicClass;
+			if (AnthropicSdk && error instanceof AnthropicSdk.APIError && error.headers) {
 				const retryAfterMs = extractRetryAfterMs(error.headers, error.message);
 				if (retryAfterMs !== undefined) {
 					output.retryAfterMs = retryAfterMs;
@@ -548,13 +560,14 @@ function isOAuthToken(apiKey: string): boolean {
 	return apiKey.includes("sk-ant-oat");
 }
 
-function createClient(
+async function createClient(
 	model: Model<"anthropic-messages">,
 	apiKey: string,
 	interleavedThinking: boolean,
 	optionsHeaders?: Record<string, string>,
 	dynamicHeaders?: Record<string, string>,
-): { client: Anthropic; isOAuthToken: boolean } {
+): Promise<{ client: Anthropic; isOAuthToken: boolean }> {
+	const AnthropicClass = await getAnthropicClass();
 	// Adaptive thinking models (Opus 4.6, Sonnet 4.6) have interleaved thinking built-in.
 	// The beta header is deprecated on Opus 4.6 and redundant on Sonnet 4.6, so skip it.
 	const needsInterleavedBeta = interleavedThinking && !supportsAdaptiveThinking(model.id);
@@ -566,7 +579,7 @@ function createClient(
 			betaFeatures.push("interleaved-thinking-2025-05-14");
 		}
 
-		const client = new Anthropic({
+		const client = new AnthropicClass({
 			apiKey: null,
 			authToken: apiKey,
 			baseURL: model.baseUrl,
@@ -595,7 +608,7 @@ function createClient(
 
 	// OAuth: Bearer auth, Claude Code identity headers
 	if (isOAuthToken(apiKey)) {
-		const client = new Anthropic({
+		const client = new AnthropicClass({
 			apiKey: null,
 			authToken: apiKey,
 			baseURL: model.baseUrl,
@@ -619,7 +632,7 @@ function createClient(
 	// API key auth
 	// Alibaba Coding Plan uses Bearer token auth instead of x-api-key
 	const isAlibabaProvider = model.provider === "alibaba-coding-plan";
-	const client = new Anthropic({
+	const client = new AnthropicClass({
 		apiKey: isAlibabaProvider ? null : apiKey,
 		authToken: isAlibabaProvider ? apiKey : undefined,
 		baseURL: model.baseUrl,

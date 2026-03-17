@@ -1,4 +1,6 @@
-import OpenAI from "openai";
+// Lazy-loaded: OpenAI SDK is imported on first use, not at startup.
+// This avoids penalizing users who don't use OpenAI models.
+import type OpenAI from "openai";
 import type {
 	ChatCompletionAssistantMessageParam,
 	ChatCompletionChunk,
@@ -32,6 +34,15 @@ import { sanitizeSurrogates } from "../utils/sanitize-unicode.js";
 import { buildCopilotDynamicHeaders, hasCopilotVisionInput } from "./github-copilot-headers.js";
 import { buildBaseOptions, clampReasoning } from "./simple-options.js";
 import { transformMessages } from "./transform-messages.js";
+
+let _OpenAICompletionsClass: typeof OpenAI | undefined;
+async function getOpenAICompletionsClass(): Promise<typeof OpenAI> {
+	if (!_OpenAICompletionsClass) {
+		const mod = await import("openai");
+		_OpenAICompletionsClass = mod.default;
+	}
+	return _OpenAICompletionsClass;
+}
 
 /**
  * Check if conversation messages contain tool calls or tool results.
@@ -85,7 +96,7 @@ export const streamOpenAICompletions: StreamFunction<"openai-completions", OpenA
 
 		try {
 			const apiKey = options?.apiKey || getEnvApiKey(model.provider) || "";
-			const client = createClient(model, context, apiKey, options?.headers);
+			const client = await createClient(model, context, apiKey, options?.headers);
 			let params = buildParams(model, context, options);
 			const nextParams = await options?.onPayload?.(params, model);
 			if (nextParams !== undefined) {
@@ -327,7 +338,7 @@ export const streamSimpleOpenAICompletions: StreamFunction<"openai-completions",
 	} satisfies OpenAICompletionsOptions);
 };
 
-function createClient(
+async function createClient(
 	model: Model<"openai-completions">,
 	context: Context,
 	apiKey?: string,
@@ -358,8 +369,9 @@ function createClient(
 	}
 
 	const isZai = model.provider === "zai" || model.baseUrl.includes("api.z.ai");
+	const OpenAIClass = await getOpenAICompletionsClass();
 
-	return new OpenAI({
+	return new OpenAIClass({
 		apiKey,
 		baseURL: model.baseUrl,
 		dangerouslyAllowBrowser: true,
