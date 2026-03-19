@@ -86,7 +86,10 @@ const BASELINE_PATTERNS = [
  * `.gsd/` state is managed externally (symlinked to `~/.gsd/projects/<hash>/`),
  * so the entire directory is always gitignored.
  */
-export function ensureGitignore(basePath: string, options?: { manageGitignore?: boolean }): boolean {
+export function ensureGitignore(
+  basePath: string,
+  options?: { manageGitignore?: boolean; commitDocs?: boolean },
+): boolean {
   // If manage_gitignore is explicitly false, do not touch .gitignore at all
   if (options?.manageGitignore === false) return false;
 
@@ -211,5 +214,4 @@ custom_instructions:
   writeFileSync(preferencesPath, template, "utf-8");
   return true;
 }
-
 

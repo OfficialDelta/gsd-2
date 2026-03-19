@@ -11,10 +11,15 @@
 
 import type { GSDState } from "./types.js";
 import type { GSDPreferences } from "./preferences.js";
-import { loadFile, loadActiveOverrides, parseRoadmap } from "./files.js";
+import type { UatType } from "./files.js";
+import { loadFile, extractUatType, loadActiveOverrides } from "./files.js";
 import {
-  resolveMilestoneFile, resolveMilestonePath, resolveSliceFile, resolveTaskFile,
-  relSliceFile, buildMilestoneFileName,
+  resolveMilestoneFile,
+  resolveMilestonePath,
+  resolveSliceFile,
+  resolveTaskFile,
+  relSliceFile,
+  buildMilestoneFileName,
 } from "./paths.js";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -38,7 +43,13 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────
 
 export type DispatchAction =
-  | { action: "dispatch"; unitType: string; unitId: string; prompt: string }
+  | {
+      action: "dispatch";
+      unitType: string;
+      unitId: string;
+      prompt: string;
+      pauseAfterDispatch?: boolean;
+    }
   | { action: "stop"; reason: string; level: "info" | "warning" | "error" }
   | { action: "skip" };
 
@@ -57,34 +68,20 @@ interface DispatchRule {
   match: (ctx: DispatchContext) => Promise<DispatchAction | null>;
 }
 
+function missingSliceStop(mid: string, phase: string): DispatchAction {
+  return {
+    action: "stop",
+    reason: `${mid}: phase "${phase}" has no active slice — run /gsd doctor.`,
+    level: "error",
+  };
+}
+
 // ─── Rewrite Circuit Breaker ──────────────────────────────────────────────
 
 const MAX_REWRITE_ATTEMPTS = 3;
 let rewriteAttemptCount = 0;
 export function resetRewriteCircuitBreaker(): void {
   rewriteAttemptCount = 0;
-}
-
-/**
- * Guard for accessing activeSlice/activeTask in dispatch rules.
- * Returns a stop action if the expected ref is null (corrupt state).
- */
-function requireSlice(state: GSDState): { sid: string; sTitle: string } | DispatchAction {
-  if (!state.activeSlice) {
-    return { action: "stop", reason: `Phase "${state.phase}" but no active slice — run /gsd doctor.`, level: "error" };
-  }
-  return { sid: state.activeSlice.id, sTitle: state.activeSlice.title };
-}
-
-function requireTask(state: GSDState): { sid: string; sTitle: string; tid: string; tTitle: string } | DispatchAction {
-  if (!state.activeSlice || !state.activeTask) {
-    return { action: "stop", reason: `Phase "${state.phase}" but no active slice/task — run /gsd doctor.`, level: "error" };
-  }
-  return { sid: state.activeSlice.id, sTitle: state.activeSlice.title, tid: state.activeTask.id, tTitle: state.activeTask.title };
-}
-
-function isStopAction(v: unknown): v is DispatchAction {
-  return typeof v === "object" && v !== null && "action" in v;
 }
 
 // ─── Rules ────────────────────────────────────────────────────────────────
@@ -107,7 +104,13 @@ const DISPATCH_RULES: DispatchRule[] = [
         action: "dispatch",
         unitType: "rewrite-docs",
         unitId,
-        prompt: await buildRewriteDocsPrompt(mid, midTitle, state.activeSlice, basePath, pendingOverrides),
+        prompt: await buildRewriteDocsPrompt(
+          mid,
+          midTitle,
+          state.activeSlice,
+          basePath,
+          pendingOverrides,
+        ),
       };
     },
   },
@@ -115,44 +118,21 @@ const DISPATCH_RULES: DispatchRule[] = [
     name: "summarizing → complete-slice",
     match: async ({ state, mid, midTitle, basePath }) => {
       if (state.phase !== "summarizing") return null;
-      const sliceRef = requireSlice(state);
-      if (isStopAction(sliceRef)) return sliceRef as DispatchAction;
-      const { sid, sTitle } = sliceRef;
+      if (!state.activeSlice) return missingSliceStop(mid, state.phase);
+      const sid = state.activeSlice!.id;
+      const sTitle = state.activeSlice!.title;
       return {
         action: "dispatch",
         unitType: "complete-slice",
         unitId: `${mid}/${sid}`,
-        prompt: await buildCompleteSlicePrompt(mid, midTitle, sid, sTitle, basePath),
+        prompt: await buildCompleteSlicePrompt(
+          mid,
+          midTitle,
+          sid,
+          sTitle,
+          basePath,
+        ),
       };
-    },
-  },
-  {
-    name: "uat-verdict-gate (non-PASS blocks progression)",
-    match: async ({ mid, basePath, prefs }) => {
-      // Only applies when UAT dispatch is enabled
-      if (!prefs?.uat_dispatch) return null;
-
-      const roadmapFile = resolveMilestoneFile(basePath, mid, "ROADMAP");
-      const roadmapContent = roadmapFile ? await loadFile(roadmapFile) : null;
-      if (!roadmapContent) return null;
-
-      const roadmap = parseRoadmap(roadmapContent);
-      for (const slice of roadmap.slices.filter(s => s.done)) {
-        const resultFile = resolveSliceFile(basePath, mid, slice.id, "UAT-RESULT");
-        if (!resultFile) continue;
-        const content = await loadFile(resultFile);
-        if (!content) continue;
-        const verdictMatch = content.match(/verdict:\s*([\w-]+)/i);
-        const verdict = verdictMatch?.[1]?.toLowerCase();
-        if (verdict && verdict !== "pass" && verdict !== "passed") {
-          return {
-            action: "stop" as const,
-            reason: `UAT verdict for ${slice.id} is "${verdict}" — blocking progression until resolved.\nReview the UAT result and update the verdict to PASS, or re-run /gsd auto after fixing.`,
-            level: "warning" as const,
-          };
-        }
-      }
-      return null;
     },
   },
   {
@@ -160,29 +140,41 @@ const DISPATCH_RULES: DispatchRule[] = [
     match: async ({ state, mid, basePath, prefs }) => {
       const needsRunUat = await checkNeedsRunUat(basePath, mid, state, prefs);
       if (!needsRunUat) return null;
-      const { sliceId } = needsRunUat;
+      const { sliceId, uatType } = needsRunUat;
+      const uatFile = resolveSliceFile(basePath, mid, sliceId, "UAT")!;
+      const uatContent = await loadFile(uatFile);
       return {
         action: "dispatch",
         unitType: "run-uat",
         unitId: `${mid}/${sliceId}`,
         prompt: await buildRunUatPrompt(
-          mid, sliceId, relSliceFile(basePath, mid, sliceId, "UAT"), basePath,
+          mid,
+          sliceId,
+          relSliceFile(basePath, mid, sliceId, "UAT"),
+          uatContent ?? "",
+          basePath,
         ),
+        pauseAfterDispatch: uatType !== "artifact-driven",
       };
     },
   },
   {
     name: "reassess-roadmap (post-completion)",
     match: async ({ state, mid, midTitle, basePath, prefs }) => {
-      // Reassess is opt-in: only fire when explicitly enabled
-      if (!prefs?.phases?.reassess_after_slice) return null;
+      if (prefs?.phases?.skip_reassess || !prefs?.phases?.reassess_after_slice)
+        return null;
       const needsReassess = await checkNeedsReassessment(basePath, mid, state);
       if (!needsReassess) return null;
       return {
         action: "dispatch",
         unitType: "reassess-roadmap",
         unitId: `${mid}/${needsReassess.sliceId}`,
-        prompt: await buildReassessRoadmapPrompt(mid, midTitle, needsReassess.sliceId, basePath),
+        prompt: await buildReassessRoadmapPrompt(
+          mid,
+          midTitle,
+          needsReassess.sliceId,
+          basePath,
+        ),
       };
     },
   },
@@ -202,7 +194,7 @@ const DISPATCH_RULES: DispatchRule[] = [
     match: async ({ state, mid, basePath }) => {
       if (state.phase !== "pre-planning") return null;
       const contextFile = resolveMilestoneFile(basePath, mid, "CONTEXT");
-      const hasContext = !!(contextFile && await loadFile(contextFile));
+      const hasContext = !!(contextFile && (await loadFile(contextFile)));
       if (hasContext) return null; // fall through to next rule
       return {
         action: "stop",
@@ -244,21 +236,32 @@ const DISPATCH_RULES: DispatchRule[] = [
     match: async ({ state, mid, midTitle, basePath, prefs }) => {
       if (state.phase !== "planning") return null;
       // Phase skip: skip research when preference or profile says so
-      if (prefs?.phases?.skip_research || prefs?.phases?.skip_slice_research) return null;
-      const sliceRef = requireSlice(state);
-      if (isStopAction(sliceRef)) return sliceRef as DispatchAction;
-      const { sid, sTitle } = sliceRef;
+      if (prefs?.phases?.skip_research || prefs?.phases?.skip_slice_research)
+        return null;
+      if (!state.activeSlice) return missingSliceStop(mid, state.phase);
+      const sid = state.activeSlice!.id;
+      const sTitle = state.activeSlice!.title;
       const researchFile = resolveSliceFile(basePath, mid, sid, "RESEARCH");
       if (researchFile) return null; // has research, fall through
       // Skip slice research for S01 when milestone research already exists —
       // the milestone research already covers the same ground for the first slice.
-      const milestoneResearchFile = resolveMilestoneFile(basePath, mid, "RESEARCH");
+      const milestoneResearchFile = resolveMilestoneFile(
+        basePath,
+        mid,
+        "RESEARCH",
+      );
       if (milestoneResearchFile && sid === "S01") return null; // fall through to plan-slice
       return {
         action: "dispatch",
         unitType: "research-slice",
         unitId: `${mid}/${sid}`,
-        prompt: await buildResearchSlicePrompt(mid, midTitle, sid, sTitle, basePath),
+        prompt: await buildResearchSlicePrompt(
+          mid,
+          midTitle,
+          sid,
+          sTitle,
+          basePath,
+        ),
       };
     },
   },
@@ -266,14 +269,20 @@ const DISPATCH_RULES: DispatchRule[] = [
     name: "planning → plan-slice",
     match: async ({ state, mid, midTitle, basePath }) => {
       if (state.phase !== "planning") return null;
-      const sliceRef = requireSlice(state);
-      if (isStopAction(sliceRef)) return sliceRef as DispatchAction;
-      const { sid, sTitle } = sliceRef;
+      if (!state.activeSlice) return missingSliceStop(mid, state.phase);
+      const sid = state.activeSlice!.id;
+      const sTitle = state.activeSlice!.title;
       return {
         action: "dispatch",
         unitType: "plan-slice",
         unitId: `${mid}/${sid}`,
-        prompt: await buildPlanSlicePrompt(mid, midTitle, sid, sTitle, basePath),
+        prompt: await buildPlanSlicePrompt(
+          mid,
+          midTitle,
+          sid,
+          sTitle,
+          basePath,
+        ),
       };
     },
   },
@@ -281,14 +290,20 @@ const DISPATCH_RULES: DispatchRule[] = [
     name: "replanning-slice → replan-slice",
     match: async ({ state, mid, midTitle, basePath }) => {
       if (state.phase !== "replanning-slice") return null;
-      const sliceRef = requireSlice(state);
-      if (isStopAction(sliceRef)) return sliceRef as DispatchAction;
-      const { sid, sTitle } = sliceRef;
+      if (!state.activeSlice) return missingSliceStop(mid, state.phase);
+      const sid = state.activeSlice!.id;
+      const sTitle = state.activeSlice!.title;
       return {
         action: "dispatch",
         unitType: "replan-slice",
         unitId: `${mid}/${sid}`,
-        prompt: await buildReplanSlicePrompt(mid, midTitle, sid, sTitle, basePath),
+        prompt: await buildReplanSlicePrompt(
+          mid,
+          midTitle,
+          sid,
+          sTitle,
+          basePath,
+        ),
       };
     },
   },
@@ -296,9 +311,9 @@ const DISPATCH_RULES: DispatchRule[] = [
     name: "executing → execute-task (recover missing task plan → plan-slice)",
     match: async ({ state, mid, midTitle, basePath }) => {
       if (state.phase !== "executing" || !state.activeTask) return null;
-      const sliceRef = requireSlice(state);
-      if (isStopAction(sliceRef)) return sliceRef as DispatchAction;
-      const { sid, sTitle } = sliceRef;
+      if (!state.activeSlice) return missingSliceStop(mid, state.phase);
+      const sid = state.activeSlice!.id;
+      const sTitle = state.activeSlice!.title;
       const tid = state.activeTask.id;
 
       // Guard: if the slice plan exists but the individual task plan files are
@@ -312,7 +327,13 @@ const DISPATCH_RULES: DispatchRule[] = [
           action: "dispatch",
           unitType: "plan-slice",
           unitId: `${mid}/${sid}`,
-          prompt: await buildPlanSlicePrompt(mid, midTitle, sid, sTitle, basePath),
+          prompt: await buildPlanSlicePrompt(
+            mid,
+            midTitle,
+            sid,
+            sTitle,
+            basePath,
+          ),
         };
       }
 
@@ -323,9 +344,9 @@ const DISPATCH_RULES: DispatchRule[] = [
     name: "executing → execute-task",
     match: async ({ state, mid, basePath }) => {
       if (state.phase !== "executing" || !state.activeTask) return null;
-      const sliceRef = requireSlice(state);
-      if (isStopAction(sliceRef)) return sliceRef as DispatchAction;
-      const { sid, sTitle } = sliceRef;
+      if (!state.activeSlice) return missingSliceStop(mid, state.phase);
+      const sid = state.activeSlice!.id;
+      const sTitle = state.activeSlice!.title;
       const tid = state.activeTask.id;
       const tTitle = state.activeTask.title;
 
@@ -333,7 +354,14 @@ const DISPATCH_RULES: DispatchRule[] = [
         action: "dispatch",
         unitType: "execute-task",
         unitId: `${mid}/${sid}/${tid}`,
-        prompt: await buildExecuteTaskPrompt(mid, sid, sTitle, tid, tTitle, basePath),
+        prompt: await buildExecuteTaskPrompt(
+          mid,
+          sid,
+          sTitle,
+          tid,
+          tTitle,
+          basePath,
+        ),
       };
     },
   },
@@ -346,7 +374,10 @@ const DISPATCH_RULES: DispatchRule[] = [
         const mDir = resolveMilestonePath(basePath, mid);
         if (mDir) {
           if (!existsSync(mDir)) mkdirSync(mDir, { recursive: true });
-          const validationPath = join(mDir, buildMilestoneFileName(mid, "VALIDATION"));
+          const validationPath = join(
+            mDir,
+            buildMilestoneFileName(mid, "VALIDATION"),
+          );
           const content = [
             "---",
             "verdict: pass",
@@ -381,6 +412,17 @@ const DISPATCH_RULES: DispatchRule[] = [
       };
     },
   },
+  {
+    name: "complete → stop",
+    match: async ({ state }) => {
+      if (state.phase !== "complete") return null;
+      return {
+        action: "stop",
+        reason: "All milestones complete.",
+        level: "info",
+      };
+    },
+  },
 ];
 
 // ─── Resolver ─────────────────────────────────────────────────────────────
@@ -389,7 +431,9 @@ const DISPATCH_RULES: DispatchRule[] = [
  * Evaluate dispatch rules in order. Returns the first matching action,
  * or a "stop" action if no rule matches (unhandled phase).
  */
-export async function resolveDispatch(ctx: DispatchContext): Promise<DispatchAction> {
+export async function resolveDispatch(
+  ctx: DispatchContext,
+): Promise<DispatchAction> {
   for (const rule of DISPATCH_RULES) {
     const result = await rule.match(ctx);
     if (result) return result;
@@ -405,5 +449,5 @@ export async function resolveDispatch(ctx: DispatchContext): Promise<DispatchAct
 
 /** Exposed for testing — returns the rule names in evaluation order. */
 export function getDispatchRuleNames(): string[] {
-  return DISPATCH_RULES.map(r => r.name);
+  return DISPATCH_RULES.map((r) => r.name);
 }

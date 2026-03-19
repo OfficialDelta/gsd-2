@@ -21,7 +21,12 @@ Full documentation for `~/.gsd/preferences.md` (global) and `.gsd/preferences.md
 **Empty arrays (`[]`) are equivalent to omitting the field entirely.** During validation, GSD deletes empty arrays from the preferences object (see `validatePreferences()` in `preferences.ts`):
 
 ```typescript
-for (const key of ["always_use_skills", "prefer_skills", "avoid_skills", "custom_instructions"] as const) {
+for (const key of [
+  "always_use_skills",
+  "prefer_skills",
+  "avoid_skills",
+  "custom_instructions",
+] as const) {
   if (validated[key] && validated[key]!.length === 0) {
     delete validated[key];
   }
@@ -50,6 +55,7 @@ Preferences are loaded from two locations and merged:
 2. **Project:** `.gsd/preferences.md` — applies to the current project only
 
 **Merge behavior** (see `mergePreferences()` in `preferences.ts`):
+
 - **Scalar fields** (`skill_discovery`, `budget_ceiling`, etc.): Project wins if defined, otherwise global. Uses nullish coalescing (`??`).
 - **Array fields** (`always_use_skills`, `prefer_skills`, etc.): Concatenated via `mergeStringLists()` (global first, then project).
 - **Object fields** (`models`, `git`, `auto_supervisor`): Shallow merge via spread operator `{ ...base, ...override }`.
@@ -60,10 +66,10 @@ For `models`, project settings override global at the phase level. If global has
 
 These are **separate concerns**:
 
-| Field | What it controls | Code reference |
-|-------|-----------------|----------------|
-| `skill_discovery` | **Whether** GSD looks for relevant skills during research | `resolveSkillDiscoveryMode()` in `preferences.ts` |
-| `always_use_skills`, `prefer_skills`, `avoid_skills` | **Which** skills to use when they're found relevant | `renderPreferencesForSystemPrompt()` in `preferences.ts` |
+| Field                                                | What it controls                                          | Code reference                                           |
+| ---------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------- |
+| `skill_discovery`                                    | **Whether** GSD looks for relevant skills during research | `resolveSkillDiscoveryMode()` in `preferences.ts`        |
+| `always_use_skills`, `prefer_skills`, `avoid_skills` | **Which** skills to use when they're found relevant       | `renderPreferencesForSystemPrompt()` in `preferences.ts` |
 
 Setting `prefer_skills: []` does **not** disable skill discovery — it just means you have no preference overrides. Use `skill_discovery: off` to disable discovery entirely.
 
@@ -75,14 +81,14 @@ Setting `prefer_skills: []` does **not** disable skill discovery — it just mea
 
 - `mode`: workflow mode — `"solo"` or `"team"`. Sets sensible defaults for git and project settings based on your workflow. Mode defaults are the lowest priority layer — any explicit preference overrides them. Omit to configure everything manually.
 
-  | Setting | `solo` | `team` |
-  |---|---|---|
-  | `git.auto_push` | `true` | `false` |
-  | `git.push_branches` | `false` | `true` |
-  | `git.pre_merge_check` | `false` | `true` |
-  | `git.merge_strategy` | `"squash"` | `"squash"` |
-  | `git.isolation` | `"worktree"` | `"worktree"` |
-  | `unique_milestone_ids` | `false` | `true` |
+  | Setting                | `solo`       | `team`       |
+  | ---------------------- | ------------ | ------------ |
+  | `git.auto_push`        | `true`       | `false`      |
+  | `git.push_branches`    | `false`      | `true`       |
+  | `git.pre_merge_check`  | `false`      | `true`       |
+  | `git.merge_strategy`   | `"squash"`   | `"squash"`   |
+  | `git.isolation`        | `"worktree"` | `"worktree"` |
+  | `unique_milestone_ids` | `false`      | `true`       |
 
   Quick setup: `/gsd mode` (global) or `/gsd mode project` (project-level).
 
@@ -141,11 +147,12 @@ Setting `prefer_skills: []` does **not** disable skill discovery — it just mea
 
 - `context_pause_threshold`: number (0-100) — context window usage percentage at which auto-mode should pause to suggest checkpointing. Set to `0` to disable. Default: `0` (disabled).
 
-- `token_profile`: `"budget"`, `"balanced"`, or `"quality"` — coordinates model selection, phase skipping, and context compression. `budget` skips research/reassessment and uses cheaper models; `balanced` (default) runs all phases; `quality` prefers higher-quality models. See token-optimization docs.
+- `token_profile`: `"budget"`, `"balanced"`, or `"quality"` — coordinates model selection, phase skipping, and context compression. `budget` skips research/reassessment and uses cheaper models; `balanced` (default) skips research/reassessment to reduce token burn; `quality` prefers higher-quality models. See token-optimization docs.
 
 - `phases`: fine-grained control over which phases run. Usually set by `token_profile`, but can be overridden. Keys:
   - `skip_research`: boolean — skip milestone-level research. Default: `false`.
-  - `skip_reassess`: boolean — skip roadmap reassessment after each slice. Default: `false`.
+  - `reassess_after_slice`: boolean — run roadmap reassessment after each completed slice. Default: `false`.
+  - `skip_reassess`: boolean — force-disable roadmap reassessment even if `reassess_after_slice` is enabled. Default: `false`.
   - `skip_slice_research`: boolean — skip per-slice research. Default: `false`.
 
 - `remote_questions`: route interactive questions to Slack/Discord for headless auto-mode. Keys:
@@ -359,11 +366,11 @@ If you use a bare model ID (no provider prefix) and it exists in multiple provid
 ---
 version: 1
 models:
-  research: openrouter/deepseek/deepseek-r1  # $0.28/$0.42 per 1M tokens
+  research: openrouter/deepseek/deepseek-r1 # $0.28/$0.42 per 1M tokens
   planning:
-    model: claude-opus-4-6                   # $5/$25 — best for architecture
+    model: claude-opus-4-6 # $5/$25 — best for architecture
     fallbacks:
-      - openrouter/z-ai/glm-5                # $1/$3.20 — strong alternative
+      - openrouter/z-ai/glm-5 # $1/$3.20 — strong alternative
   execution: openrouter/minimax/minimax-m2.5 # $0.30/$1.20 — cheapest quality
   completion: openrouter/minimax/minimax-m2.5
 ---

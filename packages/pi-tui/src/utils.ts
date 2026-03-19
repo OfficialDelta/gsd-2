@@ -85,12 +85,7 @@ export function extractAnsiCode(str: string, pos: number): { code: string; lengt
  * Delegates to the native Rust implementation.
  */
 export function visibleWidth(str: string): number {
-	try {
-		return nativeVisibleWidth(str);
-	} catch {
-		// JS fallback — strip ANSI codes and return length (#1418)
-		return str.replace(/\x1b\[[0-9;]*m/g, "").length;
-	}
+	return nativeVisibleWidth(str);
 }
 
 /**
@@ -102,28 +97,7 @@ export function visibleWidth(str: string): number {
  * @returns Array of wrapped lines (NOT padded to width)
  */
 export function wrapTextWithAnsi(text: string, width: number): string[] {
-	try {
-		return nativeWrapTextWithAnsi(text, width);
-	} catch {
-		// JS fallback when native addon is unavailable (e.g., glibc mismatch on older Linux) (#1418)
-		const lines: string[] = [];
-		for (const line of text.split("\n")) {
-			if (line.length <= width) {
-				lines.push(line);
-			} else {
-				// Simple word-wrap without ANSI awareness
-				let remaining = line;
-				while (remaining.length > width) {
-					const breakAt = remaining.lastIndexOf(" ", width);
-					const splitPoint = breakAt > 0 ? breakAt : width;
-					lines.push(remaining.slice(0, splitPoint));
-					remaining = remaining.slice(splitPoint).trimStart();
-				}
-				if (remaining) lines.push(remaining);
-			}
-		}
-		return lines;
-	}
+	return nativeWrapTextWithAnsi(text, width);
 }
 
 /**

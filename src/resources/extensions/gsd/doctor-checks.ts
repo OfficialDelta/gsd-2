@@ -314,10 +314,9 @@ export async function checkRuntimeHealth(
         });
 
         if (shouldFix("orphaned_completed_units")) {
-          const { removePersistedKey } = await import("./auto-recovery.js");
-          for (const key of orphaned) {
-            removePersistedKey(basePath, key);
-          }
+          const orphanedSet = new Set(orphaned);
+          const remaining = keys.filter((key) => !orphanedSet.has(key));
+          await saveFile(completedKeysFile, JSON.stringify(remaining));
           fixesApplied.push(`removed ${orphaned.length} orphaned completed-unit key(s)`);
         }
       }
