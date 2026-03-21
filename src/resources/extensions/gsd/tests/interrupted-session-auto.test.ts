@@ -132,11 +132,12 @@ test("direct /gsd auto source only resumes paused-session metadata for recoverab
   const source = await import(`node:fs/promises`).then((fs) =>
     fs.readFile(new URL("../auto.ts", import.meta.url), "utf-8")
   );
+  assert.ok(source.includes('const shouldResumePausedSession ='));
   assert.ok(source.includes('freshStartAssessment.classification === "recoverable"'));
+  assert.ok(source.includes('&& ('));
   assert.ok(source.includes('freshStartAssessment.hasResumableDiskState'));
   assert.ok(source.includes('|| !!freshStartAssessment.recoveryPrompt'));
   assert.ok(source.includes('|| !!freshStartAssessment.lock'));
-  assert.ok(!source.includes('freshStartAssessment.classification === "recoverable"\n          || freshStartAssessment.hasResumableDiskState'));
 });
 
 test("auto module imports successfully after interrupted-session changes", async () => {

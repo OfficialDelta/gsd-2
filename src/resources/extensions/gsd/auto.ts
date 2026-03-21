@@ -954,23 +954,39 @@ export async function startAuto(
   if (!s.paused) {
     try {
       const meta = freshStartAssessment.pausedSession ?? readPausedSessionMetadata(base);
+      const pausedPath = join(gsdRoot(base), "runtime", "paused-session.json");
       if (meta?.milestoneId) {
-        s.currentMilestoneId = meta.milestoneId;
-        s.originalBasePath = meta.originalBasePath || base;
-        s.stepMode = meta.stepMode ?? requestedStepMode;
-        s.pausedSessionFile = meta.sessionFile ?? null;
-        s.paused = true;
-        const pausedPath = join(gsdRoot(base), "runtime", "paused-session.json");
-        try { unlinkSync(pausedPath); } catch { /* non-fatal */ }
-        ctx.ui.notify(
-          `Resuming paused session for ${meta.milestoneId}${meta.worktreePath ? ` (worktree)` : ""}.`,
-          "info",
-        );
+        const shouldResumePausedSession =
+          freshStartAssessment.classification === "recoverable"
+          && (
+            freshStartAssessment.hasResumableDiskState
+            || !!freshStartAssessment.recoveryPrompt
+            || !!freshStartAssessment.lock
+          );
+        if (shouldResumePausedSession) {
+          s.currentMilestoneId = meta.milestoneId;
+          s.originalBasePath = meta.originalBasePath || base;
+          s.stepMode = meta.stepMode ?? requestedStepMode;
+          s.pausedSessionFile = meta.sessionFile ?? null;
+          s.paused = true;
+          try { unlinkSync(pausedPath); } catch { /* non-fatal */ }
+          ctx.ui.notify(
+            `Resuming paused session for ${meta.milestoneId}${meta.worktreePath ? ` (worktree)` : ""}.`,
+            "info",
+          );
+        } else if (existsSync(pausedPath)) {
+          try { unlinkSync(pausedPath); } catch { /* non-fatal */ }
+        }
       }
     } catch {
       // Malformed or missing — proceed with fresh bootstrap
     }
   }
+
+  if (!s.paused) {
+    s.stepMode = requestedStepMode;
+  }
+
 
   if (freshStartAssessment.classification !== "running" && freshStartAssessment.lock) {
     clearLock(base);
@@ -1005,7 +1021,7 @@ export async function startAuto(
     s.paused = false;
     s.active = true;
     s.verbose = verboseMode;
-    s.stepMode = requestedStepMode;
+    s.stepMode = s.stepMode || requestedStepMode;
     s.cmdCtx = ctx;
     s.basePath = base;
     s.unitDispatchCount.clear();
