@@ -970,7 +970,7 @@ export function mergeMilestoneToMain(
   originalBasePath_: string,
   milestoneId: string,
   roadmapContent: string,
-): { commitMessage: string; pushed: boolean; prCreated: boolean } {
+): { commitMessage: string; pushed: boolean; prCreated: boolean; codeFilesChanged: boolean } {
   const worktreeCwd = process.cwd();
   const milestoneBranch = autoWorktreeBranch(milestoneId);
 
@@ -1187,6 +1187,27 @@ export function mergeMilestoneToMain(
     }
   }
 
+  // 8c. Detect whether any non-.gsd/ code files were actually merged (#1906).
+  // When a milestone only produced .gsd/ metadata (summaries, roadmaps) but no
+  // real code, the user sees "milestone complete" but nothing changed in their
+  // codebase. Surface this so the caller can warn the user.
+  let codeFilesChanged = false;
+  if (!nothingToCommit) {
+    try {
+      const mergedFiles = nativeDiffNumstat(
+        originalBasePath_,
+        "HEAD~1",
+        "HEAD",
+      );
+      codeFilesChanged = mergedFiles.some(
+        (entry) => !entry.path.startsWith(".gsd/"),
+      );
+    } catch {
+      // If HEAD~1 doesn't exist (first commit), assume code was changed
+      codeFilesChanged = true;
+    }
+  }
+
   // 9. Auto-push if enabled
   let pushed = false;
   if (prefs.auto_push === true && !nothingToCommit) {
@@ -1282,5 +1303,5 @@ export function mergeMilestoneToMain(
   originalBase = null;
   nudgeGitBranchCache(previousCwd);
 
-  return { commitMessage, pushed, prCreated };
+  return { commitMessage, pushed, prCreated, codeFilesChanged };
 }
