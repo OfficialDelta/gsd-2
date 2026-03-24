@@ -81,7 +81,7 @@ test("#2151 bug 1: auto-stash unblocks merge when unrelated files are dirty", ()
 
     // Verify the dirty file was restored (stash popped).
     const readmeContent = readFileSync(join(repo, "README.md"), "utf-8");
-    assert.equal(readmeContent, "# modified locally\n", "stash popped — dirty file restored after merge");
+    assert.equal(readmeContent.replace(/\r\n/g, "\n"), "# modified locally\n", "stash popped — dirty file restored after merge");
   } finally {
     try { rmSync(repo, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }); } catch { /* Windows EPERM: git holds locks on .git files */ }
   }
