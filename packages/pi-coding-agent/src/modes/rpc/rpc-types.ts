@@ -231,6 +231,7 @@ export type RpcResponse =
 	// v2 Protocol
 	| { id?: string; type: "response"; command: "init"; success: true; data: RpcInitResult }
 	| { id?: string; type: "response"; command: "shutdown"; success: true }
+	| { id?: string; type: "response"; command: "subscribe"; success: true }
 
 	// Error response (any command can fail)
 	| { id?: string; type: "response"; command: string; success: false; error: string };
