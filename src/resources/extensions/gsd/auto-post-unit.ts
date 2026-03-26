@@ -84,6 +84,14 @@ export interface RogueFileWrite {
  * in postUnitPostVerification() eventually ingests rogue files, but explicit
  * detection provides immediate diagnostics so operators know the prompt failed.
  */
+function hasNonEmptyFields(row: Record<string, unknown> | null, fields: string[]): boolean {
+  if (!row) return false;
+  return fields.some(f => String(row[f] || "").trim().length > 0);
+}
+
+const MILESTONE_PLANNING_FIELDS = ["title", "vision", "requirement_coverage", "boundary_map_markdown"];
+const SLICE_PLANNING_FIELDS = ["title", "demo", "risk", "depends"];
+
 export function detectRogueFileWrites(
   unitType: string,
   unitId: string,
@@ -124,12 +132,7 @@ export function detectRogueFileWrites(
     if (!roadmapPath || !existsSync(roadmapPath)) return [];
 
     const dbRow = getMilestone(mid);
-    const hasPlanningState = !!dbRow && (
-      String(dbRow.title || "").trim().length > 0 ||
-      String(dbRow.vision || "").trim().length > 0 ||
-      String(dbRow.requirement_coverage || "").trim().length > 0 ||
-      String(dbRow.boundary_map_markdown || "").trim().length > 0
-    );
+    const hasPlanningState = hasNonEmptyFields(dbRow, MILESTONE_PLANNING_FIELDS);
 
     if (!hasPlanningState) {
       rogues.push({ path: roadmapPath, unitType, unitId });
@@ -142,12 +145,7 @@ export function detectRogueFileWrites(
     if (!planPath || !existsSync(planPath)) return [];
 
     const dbRow = getSlice(mid, sid);
-    const hasPlanningState = !!dbRow && (
-      String(dbRow.title || "").trim().length > 0 ||
-      String(dbRow.demo || "").trim().length > 0 ||
-      String(dbRow.risk || "").trim().length > 0 ||
-      String(dbRow.depends || "").trim().length > 0
-    );
+    const hasPlanningState = hasNonEmptyFields(dbRow, SLICE_PLANNING_FIELDS);
 
     if (!hasPlanningState) {
       rogues.push({ path: planPath, unitType, unitId });
