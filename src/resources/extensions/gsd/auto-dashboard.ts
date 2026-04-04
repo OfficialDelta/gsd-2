@@ -31,6 +31,7 @@ import {
   getRtkSessionSavings,
   type RtkSessionSavings,
 } from "../shared/rtk-session-stats.js";
+import { logWarning } from "./workflow-logger.js";
 
 // ─── UAT Slice Extraction ─────────────────────────────────────────────────────
 
@@ -287,7 +288,7 @@ export function updateSliceProgressCache(base: string, mid: string, activeSid?: 
         }
       } catch (err) {
         // Non-fatal — just omit task count
-        process.stderr.write(`gsd [auto-dashboard]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+        logWarning("dashboard", `operation failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
@@ -300,7 +301,7 @@ export function updateSliceProgressCache(base: string, mid: string, activeSid?: 
     };
   } catch (err) {
     // Non-fatal — widget just won't show progress bar
-    process.stderr.write(`gsd [auto-dashboard]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    logWarning("dashboard", `operation failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -336,7 +337,7 @@ function refreshLastCommit(basePath: string): void {
     lastCommitFetchedAt = Date.now();
   } catch (err) {
     // Non-fatal — just skip last commit display
-    process.stderr.write(`gsd [auto-dashboard]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    logWarning("dashboard", `operation failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -380,7 +381,7 @@ function ensureWidgetModeLoaded(): void {
       widgetMode = saved as WidgetMode;
     }
   } catch (err) { /* non-fatal — use default */
-    process.stderr.write(`gsd [auto-dashboard]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    logWarning("dashboard", `operation failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -401,7 +402,7 @@ function persistWidgetMode(mode: WidgetMode): void {
     }
     writeFileSync(prefsPath, content, "utf-8");
   } catch (err) { /* non-fatal — mode still set in memory */
-    process.stderr.write(`gsd [auto-dashboard]: file write failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    logWarning("dashboard", `file write failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -466,7 +467,7 @@ export function updateProgressWidget(
   // Cache git branch at widget creation time (not per render)
   let cachedBranch: string | null = null;
   try { cachedBranch = getCurrentBranch(accessors.getBasePath()); } catch (err) { /* not in git repo */
-    process.stderr.write(`gsd [auto-dashboard]: git branch detection failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    logWarning("dashboard", `git branch detection failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   // Cache short pwd (last 2 path segments only) + worktree/branch info
@@ -504,7 +505,8 @@ export function updateProgressWidget(
         const sessionId = ctx.sessionManager.getSessionId();
         const savings = sessionId ? getRtkSessionSavings(accessors.getBasePath(), sessionId) : null;
         cachedRtkLabel = formatRtkSavingsLabel(savings);
-      } catch {
+      } catch (err) {
+        logWarning("dashboard", `RTK savings lookup failed: ${err instanceof Error ? (err as Error).message : String(err)}`);
         cachedRtkLabel = null;
       }
     };
@@ -529,7 +531,7 @@ export function updateProgressWidget(
         refreshRtkLabel();
         cachedLines = undefined;
       } catch (err) { /* non-fatal */
-        process.stderr.write(`gsd [auto-dashboard]: DB status update failed: ${err instanceof Error ? err.message : String(err)}\n`);
+        logWarning("dashboard", `DB status update failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }, 15_000);
 

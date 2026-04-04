@@ -423,7 +423,7 @@ export function regenerateIfMissing(
           renderSummaryProjection(basePath, milestoneId, sliceId, task.id);
           regenerated++;
         } catch (err) {
-          console.error(`[projections] regenerateIfMissing SUMMARY failed for ${task.id}:`, err);
+          logWarning("projection", `regenerateIfMissing SUMMARY failed for ${task.id}: ${(err as Error).message}`);
         }
       }
     }
@@ -452,7 +452,7 @@ export function regenerateIfMissing(
     }
     return true;
   } catch (err) {
-    console.error(`[projections] regenerateIfMissing ${fileType} failed:`, err);
+    logWarning("projection", `regenerateIfMissing ${fileType} failed: ${(err as Error).message}`);
     return false;
   }
 }

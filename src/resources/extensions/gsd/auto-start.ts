@@ -66,6 +66,7 @@ import {
   isDebugEnabled,
   getDebugLogPath,
 } from "./debug-logger.js";
+import { logWarning, logError } from "./workflow-logger.js";
 import { parseUnitId } from "./unit-id.js";
 import type { AutoSession } from "./auto/session.js";
 import {
@@ -114,7 +115,7 @@ async function openProjectDbIfPresent(basePath: string): Promise<void> {
     openDatabase(gsdDbPath);
   } catch (err) {
     /* non-fatal — DB lifecycle block below will retry */
-    process.stderr.write(`gsd [auto-start]: DB open failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    logWarning("engine", `DB open failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -216,7 +217,7 @@ export async function bootstrapAutoSession(
         nativeCommit(base, "chore: init gsd");
       } catch (err) {
         /* nothing to commit */
-        process.stderr.write(`gsd [auto-start]: mkdir failed: ${err instanceof Error ? err.message : String(err)}\n`);
+        logWarning("engine", `mkdir failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
@@ -577,9 +578,7 @@ export async function bootstrapAutoSession(
           migrateFromMarkdown(s.basePath);
         }
       } catch (err) {
-        process.stderr.write(
-          `gsd-migrate: auto-migration failed: ${(err as Error).message}\n`,
-        );
+        logError("engine", `auto-migration failed: ${(err as Error).message}`);
       }
     }
     if (existsSync(gsdDbPath) && !isDbAvailable()) {
@@ -587,9 +586,7 @@ export async function bootstrapAutoSession(
         const { openDatabase: openDb } = await import("./gsd-db.js");
         openDb(gsdDbPath);
       } catch (err) {
-        process.stderr.write(
-          `gsd-db: failed to open existing database: ${(err as Error).message}\n`,
-        );
+        logError("engine", `failed to open existing database: ${(err as Error).message}`);
       }
     }
 
@@ -728,7 +725,7 @@ export async function bootstrapAutoSession(
       }
     } catch (err) {
       /* non-fatal */
-      process.stderr.write(`gsd [auto-start]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      logWarning("engine", `preflight validation failed: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     return true;

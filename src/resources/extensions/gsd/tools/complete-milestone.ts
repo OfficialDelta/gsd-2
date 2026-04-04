@@ -23,6 +23,7 @@ import { invalidateStateCache } from "../state.js";
 import { renderAllProjections } from "../workflow-projections.js";
 import { writeManifest } from "../workflow-manifest.js";
 import { appendEvent } from "../workflow-events.js";
+import { logWarning } from "../workflow-logger.js";
 
 export interface CompleteMilestoneParams {
   milestoneId: string;
@@ -191,9 +192,7 @@ export async function handleCompleteMilestone(
     await saveFile(summaryPath, summaryMd);
   } catch (renderErr) {
     // Disk render failed — roll back DB status so state stays consistent
-    process.stderr.write(
-      `gsd-db: complete_milestone — disk render failed, rolling back DB status: ${(renderErr as Error).message}\n`,
-    );
+    logWarning("tool", `complete_milestone — disk render failed, rolling back DB status: ${(renderErr as Error).message}`);
     updateMilestoneStatus(params.milestoneId, 'active', null);
     invalidateStateCache();
     return { error: `disk render failed: ${(renderErr as Error).message}` };
@@ -217,9 +216,7 @@ export async function handleCompleteMilestone(
       trigger_reason: params.triggerReason,
     });
   } catch (hookErr) {
-    process.stderr.write(
-      `gsd: complete-milestone post-mutation hook warning: ${(hookErr as Error).message}\n`,
-    );
+    logWarning("tool", `complete-milestone post-mutation hook warning: ${(hookErr as Error).message}`);
   }
 
   return {

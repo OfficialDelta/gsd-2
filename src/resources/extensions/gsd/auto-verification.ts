@@ -22,6 +22,7 @@ import {
   runDependencyAudit,
 } from "./verification-gate.js";
 import { writeVerificationJSON } from "./verification-evidence.js";
+import { logWarning } from "./workflow-logger.js";
 import type { AutoSession } from "./auto/session.js";
 import { join } from "node:path";
 
@@ -159,9 +160,7 @@ export async function runPostUnitVerification(
           }
         }
       } catch (evidenceErr) {
-        process.stderr.write(
-          `verification-evidence: write error — ${(evidenceErr as Error).message}\n`,
-        );
+        logWarning("engine", `verification-evidence write error: ${(evidenceErr as Error).message}`);
       }
     }
 
@@ -217,9 +216,7 @@ export async function runPostUnitVerification(
     }
   } catch (err) {
     // Gate errors are non-fatal
-    process.stderr.write(
-      `verification-gate: error — ${(err as Error).message}\n`,
-    );
+    logWarning("engine", `verification-gate error: ${(err as Error).message}`);
     return "continue";
   }
 }

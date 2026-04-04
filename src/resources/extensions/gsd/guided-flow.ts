@@ -52,6 +52,7 @@ export {
   buildExistingMilestonesContext,
 } from "./guided-flow-queue.js";
 import { getErrorMessage } from "./error-utils.js";
+import { logWarning } from "./workflow-logger.js";
 
 // ─── ID Generation with Reservation ─────────────────────────────────────────
 
@@ -180,7 +181,7 @@ export function checkAutoStartAfterDiscuss(): boolean {
           );
         }
       }
-    } catch { /* non-fatal — PROJECT.md parsing failure shouldn't block auto-start */ }
+    } catch (e) { logWarning("guided", `PROJECT.md parsing failed: ${(e as Error).message}`); }
   }
 
   // Gate 4: Discussion manifest process verification (multi-milestone only)
@@ -212,7 +213,7 @@ export function checkAutoStartAfterDiscuss(): boolean {
           );
         }
       }
-    } catch { /* malformed manifest — warn but don't block */ }
+    } catch (e) { logWarning("guided", `discussion manifest verification failed: ${(e as Error).message}`); }
   }
 
   // Draft promotion cleanup: if a CONTEXT-DRAFT.md exists alongside the new
@@ -220,16 +221,16 @@ export function checkAutoStartAfterDiscuss(): boolean {
   try {
     const draftFile = resolveMilestoneFile(basePath, milestoneId, "CONTEXT-DRAFT");
     if (draftFile) unlinkSync(draftFile);
-  } catch { /* non-fatal — stale draft doesn't break anything, CONTEXT.md wins */ }
+  } catch (e) { logWarning("guided", `CONTEXT-DRAFT.md unlink failed: ${(e as Error).message}`); }
 
   // Cleanup: remove discussion manifest after auto-start (only needed during discussion)
-  try { unlinkSync(manifestPath); } catch { /* may not exist for single-milestone */ }
+  try { unlinkSync(manifestPath); } catch (e) { logWarning("guided", `manifest unlink failed: ${(e as Error).message}`); }
 
   pendingAutoStartMap.delete(basePath);
   ctx.ui.notify(`Milestone ${milestoneId} ready.`, "info");
   startAuto(ctx, pi, basePath, false, { step }).catch((err) => {
     ctx.ui.notify(`Auto-start failed: ${getErrorMessage(err)}`, "error");
-    if (process.env.GSD_DEBUG) console.error('[gsd] auto start error:', err);
+    logWarning("guided", `auto start error: ${getErrorMessage(err)}`);
     debugLog("auto-start-failed", { error: getErrorMessage(err) });
   });
   return true;
@@ -895,8 +896,8 @@ function selfHealRuntimeRecords(basePath: string, ctx: ExtensionContext): { clea
       ctx.ui.notify(`Self-heal: cleared ${cleared} stale runtime record(s) from a previous session.`, "info");
     }
     return { cleared };
-  } catch {
-    // Non-fatal — self-heal should never block the wizard
+  } catch (e) {
+    logWarning("guided", `self-heal stale runtime records failed: ${(e as Error).message}`);
     return { cleared: 0 };
   }
 }
@@ -1142,7 +1143,7 @@ export async function showSmartEntry(
             );
             return;
           }
-        } catch { /* directory exists but unreadable — fall through to normal flow */ }
+        } catch (e) { logWarning("guided", `directory read failed: ${(e as Error).message}`); }
       }
     }
 

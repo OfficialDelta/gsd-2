@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import type { ExtensionContext } from "@gsd/pi-coding-agent";
 
+import { logWarning } from "../workflow-logger.js";
 import { debugTime } from "../debug-logger.js";
 import { loadPrompt } from "../prompt-loader.js";
 import { readForensicsMarker } from "../forensics.js";
@@ -83,8 +84,8 @@ export async function buildBeforeAgentStartResult(
         memoryBlock = `\n\n${formatted}`;
       }
     }
-  } catch {
-    // non-fatal
+  } catch (e) {
+    logWarning("bootstrap", `memory block fetch failed: ${(e as Error).message}`);
   }
 
   let newSkillsBlock = "";
@@ -111,8 +112,8 @@ export async function buildBeforeAgentStartResult(
           : rawContent;
         codebaseBlock = `\n\n[PROJECT CODEBASE — File structure and descriptions (generated ${generatedAt}, may be stale — run /gsd codebase update to refresh)]\n\n${content}`;
       }
-    } catch {
-      // skip
+    } catch (e) {
+      logWarning("bootstrap", `CODEBASE file read failed: ${(e as Error).message}`);
     }
   }
 
@@ -158,8 +159,8 @@ export function loadKnowledgeBlock(gsdHomeDir: string, cwd: string): { block: st
         globalSizeKb = Buffer.byteLength(content, "utf-8") / 1024;
         globalKnowledge = content;
       }
-    } catch {
-      // skip
+    } catch (e) {
+      logWarning("bootstrap", `global knowledge file read failed: ${(e as Error).message}`);
     }
   }
 
@@ -170,8 +171,8 @@ export function loadKnowledgeBlock(gsdHomeDir: string, cwd: string): { block: st
     try {
       const content = readFileSync(knowledgePath, "utf-8").trim();
       if (content) projectKnowledge = content;
-    } catch {
-      // skip
+    } catch (e) {
+      logWarning("bootstrap", `project knowledge file read failed: ${(e as Error).message}`);
     }
   }
 
@@ -429,8 +430,8 @@ export function clearForensicsMarker(basePath: string): void {
   if (existsSync(markerPath)) {
     try {
       unlinkSync(markerPath);
-    } catch {
-      // non-fatal
+    } catch (e) {
+      logWarning("bootstrap", `unlinkSync forensics marker failed: ${(e as Error).message}`);
     }
   }
 }

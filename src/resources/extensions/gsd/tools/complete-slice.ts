@@ -30,6 +30,7 @@ import { renderRoadmapCheckboxes } from "../markdown-renderer.js";
 import { renderAllProjections } from "../workflow-projections.js";
 import { writeManifest } from "../workflow-manifest.js";
 import { appendEvent } from "../workflow-events.js";
+import { logWarning } from "../workflow-logger.js";
 
 export interface CompleteSliceResult {
   sliceId: string;
@@ -297,9 +298,7 @@ export async function handleCompleteSlice(
     }
   } catch (renderErr) {
     // Disk render failed — roll back DB status so state stays consistent
-    process.stderr.write(
-      `gsd-db: complete_slice — disk render failed, rolling back DB status: ${(renderErr as Error).message}\n`,
-    );
+    logWarning("tool", `complete_slice — disk render failed, rolling back DB status: ${(renderErr as Error).message}`);
     updateSliceStatus(params.milestoneId, params.sliceId, 'pending');
     invalidateStateCache();
     return { error: `disk render failed: ${(renderErr as Error).message}` };
@@ -326,9 +325,7 @@ export async function handleCompleteSlice(
       trigger_reason: params.triggerReason,
     });
   } catch (hookErr) {
-    process.stderr.write(
-      `gsd: complete-slice post-mutation hook warning: ${(hookErr as Error).message}\n`,
-    );
+    logWarning("tool", `complete-slice post-mutation hook warning: ${(hookErr as Error).message}`);
   }
 
   return {

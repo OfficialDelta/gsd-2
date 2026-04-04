@@ -95,8 +95,8 @@ export function resolveGitDir(basePath: string): string {
     if (content.startsWith("gitdir: ")) {
       return resolve(basePath, content.slice(8));
     }
-  } catch {
-    // Not a file or unreadable — fall through to default
+  } catch (e) {
+    logWarning("worktree", `.git file read failed: ${(e as Error).message}`);
   }
   return join(basePath, ".git");
 }
@@ -308,8 +308,9 @@ export function findNestedGitDirs(rootPath: string): string[] {
     let entries: string[];
     try {
       entries = readdirSync(dir);
-    } catch {
-      return; // Permission denied, broken symlink, etc.
+    } catch (e) {
+      logWarning("worktree", `readdirSync failed: ${(e as Error).message}`);
+      return;
     }
 
     for (const entry of entries) {
@@ -321,7 +322,8 @@ export function findNestedGitDirs(rootPath: string): string[] {
       let stat;
       try {
         stat = lstatSync(fullPath);
-      } catch {
+      } catch (e) {
+        logWarning("worktree", `lstatSync failed for ${fullPath}: ${(e as Error).message}`);
         continue;
       }
       if (!stat.isDirectory()) continue;
@@ -337,8 +339,8 @@ export function findNestedGitDirs(rootPath: string): string[] {
           // Don't recurse into the nested repo — we found what we need
           continue;
         }
-      } catch {
-        // No .git here — continue scanning
+      } catch (e) {
+        logWarning("worktree", `existsSync/.git check failed for ${fullPath}: ${(e as Error).message}`);
       }
 
       walk(fullPath, depth + 1);
@@ -374,7 +376,7 @@ export function removeWorktree(
     if (entry?.path) {
       wtPath = entry.path;
     }
-  } catch { /* fall back to computed path */ }
+  } catch (e) { logWarning("worktree", `nativeWorktreeList parse failed: ${(e as Error).message}`); }
 
   const resolvedWtPath = existsSync(wtPath) ? realpathSync(wtPath) : wtPath;
 
@@ -388,7 +390,7 @@ export function removeWorktree(
   if (!existsSync(wtPath)) {
     nativeWorktreePrune(basePath);
     if (deleteBranch) {
-      try { nativeBranchDelete(basePath, branch, true); } catch { /* branch may not exist */ }
+      try { nativeBranchDelete(basePath, branch, true); } catch (e) { logWarning("worktree", `nativeBranchDelete failed: ${(e as Error).message}`); }
     }
     return;
   }
@@ -422,8 +424,8 @@ export function removeWorktree(
           logWarning("reconcile", `Submodule changes detected — stash failed, changes may be lost during force removal`, { worktree: name, path: resolvedWtPath });
         }
       }
-    } catch {
-      // submodule status failed — proceed with normal removal
+    } catch (e) {
+      logWarning("worktree", `submodule status check failed: ${(e as Error).message}`);
     }
   }
 
@@ -454,11 +456,11 @@ export function removeWorktree(
   // Remove worktree: try non-force first when submodules have changes,
   // falling back to force only after submodule state has been preserved.
   const useForce = hasSubmoduleChanges ? false : force;
-  try { nativeWorktreeRemove(basePath, resolvedWtPath, useForce); } catch { /* may fail */ }
+  try { nativeWorktreeRemove(basePath, resolvedWtPath, useForce); } catch (e) { logWarning("worktree", `nativeWorktreeRemove failed: ${(e as Error).message}`); }
 
   // If the directory is still there (e.g. locked), try harder with force
   if (existsSync(resolvedWtPath)) {
-    try { nativeWorktreeRemove(basePath, resolvedWtPath, true); } catch { /* may fail */ }
+    try { nativeWorktreeRemove(basePath, resolvedWtPath, true); } catch (e) { logWarning("worktree", `nativeWorktreeRemove (force) failed: ${(e as Error).message}`); }
   }
 
   // (#2821) If the worktree directory STILL exists after both native removal
@@ -488,7 +490,7 @@ export function removeWorktree(
   nativeWorktreePrune(basePath);
 
   if (deleteBranch) {
-    try { nativeBranchDelete(basePath, branch, true); } catch { /* branch may not exist */ }
+    try { nativeBranchDelete(basePath, branch, true); } catch (e) { logWarning("worktree", `final branch delete failed: ${(e as Error).message}`); }
   }
 }
 

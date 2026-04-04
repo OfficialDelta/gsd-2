@@ -115,7 +115,7 @@ import {
   formatCost,
   formatTokenCount,
 } from "./metrics.js";
-import { setLogBasePath } from "./workflow-logger.js";
+import { setLogBasePath, logWarning, logError } from "./workflow-logger.js";
 import { join } from "node:path";
 import { readFileSync, existsSync, mkdirSync, writeFileSync, unlinkSync } from "node:fs";
 import { atomicWriteSync } from "./atomic-write.js";
@@ -318,7 +318,7 @@ export function getAutoDashboardData(): AutoDashboardData {
     }
   } catch (err) {
     // Non-fatal — captures module may not be loaded
-    process.stderr.write(`gsd [auto]: capture count failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    logWarning("engine", `capture count failed: ${err instanceof Error ? err.message : String(err)}`, { file: "auto.ts" });
   }
   return {
     active: s.active,
@@ -568,7 +568,7 @@ function cleanupAfterLoopExit(ctx: ExtensionContext): void {
     if (lockBase()) releaseSessionLock(lockBase());
   } catch (err) {
     /* best-effort — mirror stopAuto cleanup */
-    process.stderr.write(`gsd [auto]: lock cleanup failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    logWarning("session", `lock cleanup failed: ${err instanceof Error ? err.message : String(err)}`, { file: "auto.ts" });
   }
 
   ctx.ui.setStatus("gsd-auto", undefined);
@@ -582,7 +582,7 @@ function cleanupAfterLoopExit(ctx: ExtensionContext): void {
       process.chdir(s.basePath);
     } catch (err) {
       /* best-effort */
-      process.stderr.write(`gsd [auto]: chdir failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      logWarning("engine", `chdir failed: ${err instanceof Error ? err.message : String(err)}`, { file: "auto.ts" });
     }
   }
 }
@@ -656,7 +656,7 @@ export async function stopAuto(
           }
         } catch (err) {
           // Non-fatal — fall through to preserveBranch path
-          process.stderr.write(`gsd [auto]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+          logWarning("engine", `milestone summary check failed: ${err instanceof Error ? err.message : String(err)}`, { file: "auto.ts" });
         }
 
         if (milestoneComplete) {
@@ -693,7 +693,7 @@ export async function stopAuto(
           process.chdir(s.basePath);
         } catch (err) {
           /* best-effort */
-          process.stderr.write(`gsd [auto]: chdir failed: ${err instanceof Error ? err.message : String(err)}\n`);
+          logWarning("engine", `chdir failed: ${err instanceof Error ? err.message : String(err)}`, { file: "auto.ts" });
         }
       }
     } catch (e) {
@@ -766,7 +766,7 @@ export async function stopAuto(
       const pausedPath = join(gsdRoot(s.originalBasePath || s.basePath), "runtime", "paused-session.json");
       if (existsSync(pausedPath)) unlinkSync(pausedPath);
     } catch (err) { /* non-fatal */
-      process.stderr.write(`gsd [auto]: file unlink failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      logWarning("engine", `file unlink failed: ${err instanceof Error ? err.message : String(err)}`, { file: "auto.ts" });
     }
 
     // ── Step 13: Restore original model (before reset clears IDs) ──
@@ -802,7 +802,7 @@ export async function stopAuto(
         await closeBrowser();
       }
     } catch (err) { /* non-fatal: browser-tools may not be loaded */
-      process.stderr.write(`gsd [auto]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      logWarning("engine", `browser teardown failed: ${err instanceof Error ? err.message : String(err)}`, { file: "auto.ts" });
     }
 
     // External cleanup (not covered by session reset)
@@ -863,7 +863,7 @@ export async function pauseAuto(
     );
   } catch (err) {
     // Non-fatal — resume will still work via full bootstrap, just without worktree context
-    process.stderr.write(`gsd [auto]: file write failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    logWarning("engine", `paused-session file write failed: ${err instanceof Error ? err.message : String(err)}`, { file: "auto.ts" });
   }
 
   // Close out the current unit so its runtime record doesn't stay at "dispatched"
@@ -872,7 +872,7 @@ export async function pauseAuto(
       await closeoutUnit(ctx, s.basePath, s.currentUnit.type, s.currentUnit.id, s.currentUnit.startedAt);
     } catch (err) {
       // Non-fatal — best-effort closeout on pause
-      process.stderr.write(`gsd [auto]: dispatch failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      logWarning("engine", `unit closeout on pause failed: ${err instanceof Error ? err.message : String(err)}`, { file: "auto.ts" });
     }
     s.currentUnit = null;
   }
@@ -1097,7 +1097,7 @@ export async function startAuto(
           s.stepMode = meta.stepMode ?? requestedStepMode;
           s.paused = true;
           try { unlinkSync(pausedPath); } catch (err) { /* non-fatal */
-            process.stderr.write(`gsd [auto]: pause file cleanup failed: ${err instanceof Error ? err.message : String(err)}\n`);
+            logWarning("session", `pause file cleanup failed: ${err instanceof Error ? err.message : String(err)}`, { file: "auto.ts" });
           }
           ctx.ui.notify(
             `Resuming paused custom workflow${meta.activeRunDir ? ` (${meta.activeRunDir})` : ""}.`,
@@ -1110,7 +1110,7 @@ export async function startAuto(
           if (!mDir || summaryFile) {
             // Stale milestone — clean up and fall through to fresh bootstrap
             try { unlinkSync(pausedPath); } catch (err) { /* non-fatal */
-            process.stderr.write(`gsd [auto]: pause file cleanup failed: ${err instanceof Error ? err.message : String(err)}\n`);
+            logWarning("session", `pause file cleanup failed: ${err instanceof Error ? err.message : String(err)}`, { file: "auto.ts" });
           }
             ctx.ui.notify(
               `Paused milestone ${meta.milestoneId} is ${!mDir ? "missing" : "already complete"}. Starting fresh.`,
@@ -1123,7 +1123,7 @@ export async function startAuto(
             s.paused = true;
             // Clean up the persisted file — we're consuming it
             try { unlinkSync(pausedPath); } catch (err) { /* non-fatal */
-            process.stderr.write(`gsd [auto]: pause file cleanup failed: ${err instanceof Error ? err.message : String(err)}\n`);
+            logWarning("session", `pause file cleanup failed: ${err instanceof Error ? err.message : String(err)}`, { file: "auto.ts" });
           }
             ctx.ui.notify(
               `Resuming paused session for ${meta.milestoneId}${meta.worktreePath ? ` (worktree)` : ""}.`,
@@ -1134,7 +1134,7 @@ export async function startAuto(
       }
     } catch (err) {
       // Malformed or missing — proceed with fresh bootstrap
-      process.stderr.write(`gsd [auto]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      logWarning("session", `paused-session restore failed: ${err instanceof Error ? err.message : String(err)}`, { file: "auto.ts" });
     }
   }
 
@@ -1262,7 +1262,7 @@ export async function startAuto(
     syncCmuxSidebar(loadEffectiveGSDPreferences()?.preferences, await deriveState(s.basePath));
   } catch (err) {
     // Best-effort only — sidebar sync must never block auto-mode startup
-    process.stderr.write(`gsd [auto]: cmux sync failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    logWarning("engine", `cmux sync failed: ${err instanceof Error ? err.message : String(err)}`, { file: "auto.ts" });
   }
   logCmuxEvent(loadEffectiveGSDPreferences()?.preferences, requestedStepMode ? "Step-mode started." : "Auto-mode started.", "progress");
 
@@ -1436,7 +1436,7 @@ export async function dispatchHookUnit(
         await pi.setModel(match);
       } catch (err) {
         /* non-fatal */
-        process.stderr.write(`gsd [auto]: dispatch failed: ${err instanceof Error ? err.message : String(err)}\n`);
+        logWarning("dispatch", `hook model set failed: ${err instanceof Error ? err.message : String(err)}`, { file: "auto.ts" });
       }
     } else {
       ctx.ui.notify(
@@ -1474,7 +1474,7 @@ export async function dispatchHookUnit(
 
   // Ensure cwd matches basePath before hook dispatch (#1389)
   try { if (process.cwd() !== s.basePath) process.chdir(s.basePath); } catch (err) {
-    process.stderr.write(`gsd [auto]: chdir failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    logWarning("engine", `chdir failed before hook dispatch: ${err instanceof Error ? err.message : String(err)}`, { file: "auto.ts" });
   }
 
   debugLog("dispatchHookUnit", {

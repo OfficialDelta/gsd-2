@@ -281,7 +281,7 @@ export async function postUnitPreVerification(pctx: PostUnitContext, opts?: PreV
                   ghIssueNumber = getTaskIssueNumberForCommit(s.basePath, mid, sid, tid) ?? undefined;
                 } catch (err) {
                   // GitHub sync not available — skip
-                  process.stderr.write(`gsd [auto-post-unit]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+                  logWarning("engine", `GitHub issue lookup failed: ${err instanceof Error ? err.message : String(err)}`);
                 }
 
                 taskContext = {
@@ -559,9 +559,7 @@ export async function postUnitPostVerification(pctx: PostUnitContext): Promise<"
             } catch (dbErr) {
               // DB unavailable — fail explicitly rather than silently reverting to markdown mutation.
               // Use 'gsd recover' to rebuild DB state from disk if needed.
-              process.stderr.write(
-                `gsd: retry state-reset failed (DB unavailable): ${(dbErr as Error).message}. Run 'gsd recover' to reconcile.\n`,
-              );
+              logError("engine", `retry state-reset failed (DB unavailable): ${(dbErr as Error).message}. Run 'gsd recover' to reconcile.`);
             }
           }
 

@@ -28,7 +28,7 @@ import {
   buildSliceFileName,
 } from "./paths.js";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { logError } from "./workflow-logger.js";
+import { logWarning, logError } from "./workflow-logger.js";
 import { join } from "node:path";
 import { hasImplementationArtifacts } from "./auto-recovery.js";
 import {
@@ -713,7 +713,7 @@ export const DISPATCH_RULES: DispatchRule[] = [
           }
         }
       } catch (err) { /* fall through — don't block on DB errors */
-        process.stderr.write(`gsd [auto-dispatch]: lock cleanup failed: ${err instanceof Error ? err.message : String(err)}\n`);
+        logWarning("dispatch", `verification class check failed: ${err instanceof Error ? err.message : String(err)}`);
       }
 
       return {
@@ -758,7 +758,7 @@ export async function resolveDispatch(
     return await registry.evaluateDispatch(ctx);
   } catch (err) {
     // Registry not initialized — fall back to inline loop
-    process.stderr.write(`gsd [auto-dispatch]: dispatch failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    logWarning("dispatch", `registry dispatch failed, falling back to inline rules: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   for (const rule of DISPATCH_RULES) {

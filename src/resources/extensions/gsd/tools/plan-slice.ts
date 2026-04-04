@@ -16,6 +16,7 @@ import { renderPlanFromDb } from "../markdown-renderer.js";
 import { renderAllProjections } from "../workflow-projections.js";
 import { writeManifest } from "../workflow-manifest.js";
 import { appendEvent } from "../workflow-events.js";
+import { logWarning } from "../workflow-logger.js";
 
 export interface PlanSliceTaskInput {
   taskId: string;
@@ -229,9 +230,7 @@ export async function handlePlanSlice(
         trigger_reason: params.triggerReason,
       });
     } catch (hookErr) {
-      process.stderr.write(
-        `gsd: plan-slice post-mutation hook warning: ${(hookErr as Error).message}\n`,
-      );
+      logWarning("tool", `plan-slice post-mutation hook warning: ${(hookErr as Error).message}`);
     }
 
     return {
@@ -241,9 +240,7 @@ export async function handlePlanSlice(
       taskPlanPaths: renderResult.taskPlanPaths,
     };
   } catch (renderErr) {
-    process.stderr.write(
-      `gsd-db: plan_slice — render failed (DB rows preserved for debugging): ${(renderErr as Error).message}\n`,
-    );
+    logWarning("tool", `plan_slice — render failed (DB rows preserved for debugging): ${(renderErr as Error).message}`);
     invalidateStateCache();
     return { error: `render failed: ${(renderErr as Error).message}` };
   }

@@ -10,7 +10,7 @@ import { existsSync, copyFileSync, mkdirSync, realpathSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Decision, Requirement, GateRow, GateId, GateScope, GateStatus, GateVerdict } from "./types.js";
 import { GSDError, GSD_STALE_STATE } from "./errors.js";
-import { logError } from "./workflow-logger.js";
+import { logError, logWarning } from "./workflow-logger.js";
 
 const _require = createRequire(import.meta.url);
 
@@ -787,11 +787,11 @@ export function openDatabase(path: string): boolean {
         initSchema(adapter, fileBacked);
         process.stderr.write("gsd-db: recovered corrupt database via VACUUM\n");
       } catch (retryErr) {
-        try { adapter.close(); } catch { /* swallow */ }
+        try { adapter.close(); } catch (e) { logWarning("db", `close after VACUUM failed: ${(e as Error).message}`); }
         throw retryErr;
       }
     } else {
-      try { adapter.close(); } catch { /* swallow */ }
+      try { adapter.close(); } catch (e) { logWarning("db", `close after VACUUM failed: ${(e as Error).message}`); }
       throw err;
     }
   }
@@ -802,7 +802,7 @@ export function openDatabase(path: string): boolean {
 
   if (!_exitHandlerRegistered) {
     _exitHandlerRegistered = true;
-    process.on("exit", () => { try { closeDatabase(); } catch {} });
+    process.on("exit", () => { try { closeDatabase(); } catch (e) { logWarning("db", `exit handler close failed: ${(e as Error).message}`); } });
   }
 
   return true;
@@ -812,16 +812,14 @@ export function closeDatabase(): void {
   if (currentDb) {
     try {
       currentDb.exec('PRAGMA wal_checkpoint(TRUNCATE)');
-    } catch { /* non-fatal — best effort before close */ }
+    } catch (e) { logWarning("db", `WAL checkpoint failed: ${(e as Error).message}`); }
     try {
       // Incremental vacuum to reclaim space without blocking
       currentDb.exec('PRAGMA incremental_vacuum(64)');
-    } catch { /* non-fatal */ }
+    } catch (e) { logWarning("db", `incremental vacuum failed: ${(e as Error).message}`); }
     try {
       currentDb.close();
-    } catch {
-      // swallow close errors
-    }
+    } catch (e) { logWarning("db", `database close failed: ${(e as Error).message}`); }
     currentDb = null;
     currentPath = null;
     currentPid = 0;
@@ -833,7 +831,7 @@ export function vacuumDatabase(): void {
   if (!currentDb) return;
   try {
     currentDb.exec('VACUUM');
-  } catch { /* non-fatal */ }
+  } catch (e) { logWarning("db", `VACUUM failed: ${(e as Error).message}`); }
 }
 
 let _txDepth = 0;
@@ -1038,7 +1036,7 @@ export function upsertRequirement(r: Requirement): void {
 
 export function clearArtifacts(): void {
   if (!currentDb) return;
-  try { currentDb.exec("DELETE FROM artifacts"); } catch { /* cache clear is best effort */ }
+  try { currentDb.exec("DELETE FROM artifacts"); } catch (e) { logWarning("db", `clearArtifacts failed: ${(e as Error).message}`); }
 }
 
 export function insertArtifact(a: {
@@ -1801,7 +1799,7 @@ export function reconcileWorktreeDb(
   // ATTACHing a WAL-mode DB to itself corrupts the WAL (#2823).
   try {
     if (realpathSync(mainDbPath) === realpathSync(worktreeDbPath)) return zero;
-  } catch { /* path resolution failed — fall through to existing checks */ }
+  } catch (e) { logWarning("db", `realpathSync failed: ${(e as Error).message}`); }
   // Sanitize path: reject any characters that could break ATTACH syntax.
   // ATTACH DATABASE doesn't support parameterized paths in all providers,
   // so we use strict allowlist validation instead.
@@ -1938,12 +1936,12 @@ export function reconcileWorktreeDb(
 
         adapter.exec("COMMIT");
       } catch (txErr) {
-        try { adapter.exec("ROLLBACK"); } catch { /* best effort */ }
+        try { adapter.exec("ROLLBACK"); } catch (e) { logWarning("db", `rollback failed: ${(e as Error).message}`); }
         throw txErr;
       }
       return { ...merged, conflicts };
     } finally {
-      try { adapter.exec("DETACH DATABASE wt"); } catch { /* best effort */ }
+      try { adapter.exec("DETACH DATABASE wt"); } catch (e) { logWarning("db", `detach worktree DB failed: ${(e as Error).message}`); }
     }
   } catch (err) {
     logError("db", "worktree DB reconciliation failed", { error: (err as Error).message });

@@ -5,7 +5,7 @@ import type { ExtensionAPI } from "@gsd/pi-coding-agent";
 import { createBashTool, createEditTool, createReadTool, createWriteTool } from "@gsd/pi-coding-agent";
 
 import { DEFAULT_BASH_TIMEOUT_SECS } from "../constants.js";
-import { setLogBasePath } from "../workflow-logger.js";
+import { setLogBasePath, logWarning } from "../workflow-logger.js";
 
 /**
  * Resolve the correct DB path for the current working directory.
@@ -92,9 +92,7 @@ export async function ensureDbOpen(): Promise<boolean> {
             const { migrateFromMarkdown } = await import("../md-importer.js");
             migrateFromMarkdown(basePath);
           } catch (err) {
-            process.stderr.write(
-              `gsd-db: ensureDbOpen auto-migration failed: ${(err as Error).message}\n`,
-            );
+            logWarning("bootstrap", `ensureDbOpen auto-migration failed: ${(err as Error).message}`);
           }
         }
         return opened;
@@ -106,9 +104,7 @@ export async function ensureDbOpen(): Promise<boolean> {
       return opened;
     }
 
-    process.stderr.write(
-      `gsd-db: ensureDbOpen failed — no .gsd directory found (resolvedPath=${resolveProjectRootDbPath(basePath)}, cwd=${basePath})\n`,
-    );
+    logWarning("bootstrap", `ensureDbOpen failed — no .gsd directory found (resolvedPath=${resolveProjectRootDbPath(basePath)}, cwd=${basePath})`);
     return false;
   } catch (err) {
     const basePath = process.cwd();
@@ -117,9 +113,7 @@ export async function ensureDbOpen(): Promise<boolean> {
       cwd: basePath,
       error: (err as Error).message ?? String(err),
     };
-    process.stderr.write(
-      `gsd-db: ensureDbOpen failed — ${JSON.stringify(diagnostic)}\n`,
-    );
+    logWarning("bootstrap", `ensureDbOpen failed — ${JSON.stringify(diagnostic)}`);
     return false;
   }
 }

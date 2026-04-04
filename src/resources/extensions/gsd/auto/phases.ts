@@ -1269,7 +1269,7 @@ export async function runUnitPhase(
         nextSteps: [],
       });
     } catch (err) { /* non-fatal — anchor is advisory */
-      process.stderr.write(`gsd [phases]: phase anchor failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      logWarning("engine", `phase anchor failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

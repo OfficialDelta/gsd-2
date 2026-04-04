@@ -413,8 +413,8 @@ export function registerDbTools(pi: ExtensionAPI): void {
     try {
       const { insertMilestone } = await import("../gsd-db.js");
       insertMilestone({ id: milestoneId, status: "queued" });
-    } catch {
-      // Non-fatal — the safety-net in deriveStateFromDb will catch this
+    } catch (e) {
+      logError("tool", `insertMilestone failed for ${milestoneId}: ${(e as Error).message}`);
     }
   }
 

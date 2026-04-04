@@ -27,6 +27,7 @@ import { computeBudgets, resolveExecutorContextWindow, truncateAtSectionBoundary
 import { getPendingGates } from "./gsd-db.js";
 import { formatDecisionsCompact, formatRequirementsCompact } from "./structured-data-formatter.js";
 import { readPhaseAnchor, formatAnchorForPrompt } from "./phase-anchor.js";
+import { logWarning } from "./workflow-logger.js";
 
 // ─── Preamble Cap ─────────────────────────────────────────────────────────────
 
@@ -49,7 +50,8 @@ function formatExecutorConstraints(): string {
   try {
     const prefs = loadEffectiveGSDPreferences();
     windowTokens = resolveExecutorContextWindow(undefined, prefs?.preferences);
-  } catch {
+  } catch (e) {
+    logWarning("prompt", `resolveExecutorContextWindow failed: ${(e as Error).message}`);
     windowTokens = 200_000; // safe default
   }
   const budgets = computeBudgets(windowTokens);
@@ -198,8 +200,8 @@ export async function inlineDependencySummaries(
       }
       // If slice not found in DB, fall through to file-based parsing
     }
-  } catch (err) { /* fall through */
-    process.stderr.write(`gsd [auto-prompts]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+  } catch (err) {
+    logWarning("prompt", `inlineDependencySummaries DB lookup failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   // If DB didn't provide depends, fall back to roadmap parsing
@@ -279,8 +281,7 @@ export async function inlineDecisionsFromDb(
       }
     }
   } catch (err) {
-    // DB not available — fall through to filesystem
-    process.stderr.write(`gsd [auto-prompts]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    logWarning("prompt", `inlineDecisionsFromDb failed: ${err instanceof Error ? err.message : String(err)}`);
   }
   return inlineGsdRootFile(base, "decisions.md", "Decisions");
 }
@@ -307,8 +308,7 @@ export async function inlineRequirementsFromDb(
       }
     }
   } catch (err) {
-    // DB not available — fall through to filesystem
-    process.stderr.write(`gsd [auto-prompts]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    logWarning("prompt", `inlineRequirementsFromDb failed: ${err instanceof Error ? err.message : String(err)}`);
   }
   return inlineGsdRootFile(base, "requirements.md", "Requirements");
 }
@@ -330,8 +330,7 @@ export async function inlineProjectFromDb(
       }
     }
   } catch (err) {
-    // DB not available — fall through to filesystem
-    process.stderr.write(`gsd [auto-prompts]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    logWarning("prompt", `inlineProjectFromDb failed: ${err instanceof Error ? err.message : String(err)}`);
   }
   return inlineGsdRootFile(base, "project.md", "Project");
 }
@@ -492,8 +491,7 @@ export function buildSkillActivationBlock(params: {
         matched.add(normalizeSkillReference(skillName));
       }
     } catch (err) {
-      // Non-fatal — malformed task plan should not break prompt construction
-      process.stderr.write(`gsd [auto-prompts]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      logWarning("prompt", `parseTaskPlanFile failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -742,8 +740,8 @@ export async function checkNeedsReassessment(
         return { sliceId: lastCompleted };
       }
     }
-  } catch (err) { /* fall through */
-    process.stderr.write(`gsd [auto-prompts]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+  } catch (err) {
+    logWarning("prompt", `checkNeedsReassessment DB lookup failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   // File-based fallback using roadmap checkboxes
@@ -810,8 +808,8 @@ export async function checkNeedsRunUat(
         return { sliceId: sid, uatType };
       }
     }
-  } catch (err) { /* fall through */
-    process.stderr.write(`gsd [auto-prompts]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+  } catch (err) {
+    logWarning("prompt", `checkNeedsRunUat DB lookup failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   // File-based fallback using roadmap checkboxes
@@ -1322,8 +1320,8 @@ export async function buildCompleteMilestonePrompt(
     if (isDbAvailable()) {
       sliceIds = getMilestoneSlices(mid).map(s => s.id);
     }
-  } catch (err) { /* fall through */
-    process.stderr.write(`gsd [auto-prompts]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+  } catch (err) {
+    logWarning("prompt", `buildCompleteMilestonePrompt DB lookup failed: ${err instanceof Error ? err.message : String(err)}`);
   }
   // File-based fallback: parse roadmap for slice IDs when DB has no data
   if (sliceIds.length === 0 && roadmapPath) {
@@ -1405,8 +1403,8 @@ export async function buildValidateMilestonePrompt(
         }
       }
     }
-  } catch (err) { /* fall through */
-    process.stderr.write(`gsd [auto-prompts]: git push failed: ${err instanceof Error ? err.message : String(err)}\n`);
+  } catch (err) {
+    logWarning("prompt", `buildValidateMilestonePrompt verification classes lookup failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   // Inline all slice summaries and UAT results
@@ -1416,8 +1414,8 @@ export async function buildValidateMilestonePrompt(
     if (isDbAvailable()) {
       valSliceIds = getMilestoneSlices(mid).map(s => s.id);
     }
-  } catch (err) { /* fall through */
-    process.stderr.write(`gsd [auto-prompts]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+  } catch (err) {
+    logWarning("prompt", `buildValidateMilestonePrompt slice IDs lookup failed: ${err instanceof Error ? err.message : String(err)}`);
   }
   // File-based fallback: parse roadmap for slice IDs when DB has no data
   if (valSliceIds.length === 0 && roadmapPath) {
@@ -1558,8 +1556,7 @@ export async function buildReplanSlicePrompt(
       ).join("\n");
     }
   } catch (err) {
-    // Non-fatal — captures module may not be available
-    process.stderr.write(`gsd [auto-prompts]: capture count failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    logWarning("prompt", `loadReplanCaptures failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   return loadPrompt("replan-slice", {
@@ -1660,8 +1657,7 @@ export async function buildReassessRoadmapPrompt(
       ).join("\n");
     }
   } catch (err) {
-    // Non-fatal — captures module may not be available
-    process.stderr.write(`gsd [auto-prompts]: capture count failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    logWarning("prompt", `loadDeferredCaptures failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   const reassessCommitInstruction = "Do not commit — .gsd/ planning docs are managed externally and not tracked in git.";
@@ -1877,8 +1873,8 @@ export async function buildRewriteDocsPrompt(
               .filter(t => t.status !== "complete" && t.status !== "done")
               .map(t => ({ id: t.id }));
           }
-        } catch (err) { /* fall through */
-          process.stderr.write(`gsd [auto-prompts]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+        } catch (err) {
+          logWarning("prompt", `buildRewriteDocsPrompt DB task lookup failed: ${err instanceof Error ? err.message : String(err)}`);
         }
 
         if (!incompleteTasks) {

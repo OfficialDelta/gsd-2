@@ -22,6 +22,7 @@ import { GSDError, GSD_PARSE_ERROR } from "./errors.js";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
+import { logWarning } from "./workflow-logger.js";
 
 /**
  * Resolve the GSD extension directory.
@@ -72,7 +73,7 @@ function warmCache(): void {
     // prompts/ may not exist in test environments — lazy loading still works.
     // Emit a diagnostic when running outside tests so wrong-path bugs are visible.
     if (!process.env.VITEST && !process.env.NODE_TEST) {
-      process.stderr.write(`[gsd:prompt-loader] warmCache: prompts dir not found: ${promptsDir}\n`);
+      logWarning("prompt", `warmCache: prompts dir not found: ${promptsDir}`);
     }
   }
 
@@ -87,7 +88,7 @@ function warmCache(): void {
   } catch {
     // templates/ may not exist in test environments — lazy loading still works.
     if (!process.env.VITEST && !process.env.NODE_TEST) {
-      process.stderr.write(`[gsd:prompt-loader] warmCache: templates dir not found: ${templatesDir}\n`);
+      logWarning("prompt", `warmCache: templates dir not found: ${templatesDir}`);
     }
   }
 }

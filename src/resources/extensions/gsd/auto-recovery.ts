@@ -15,6 +15,7 @@ import { parseRoadmap as parseLegacyRoadmap, parsePlan as parseLegacyPlan } from
 import { isDbAvailable, getTask, getSlice, getSliceTasks, updateTaskStatus } from "./gsd-db.js";
 import { isValidationTerminal } from "./state.js";
 import { getErrorMessage } from "./error-utils.js";
+import { logWarning, logError } from "./workflow-logger.js";
 import {
   nativeConflictFiles,
   nativeCommit,
@@ -72,7 +73,8 @@ export function hasImplementationArtifacts(basePath: string): boolean {
         stdio: ["ignore", "pipe", "pipe"],
         encoding: "utf-8",
       });
-    } catch {
+    } catch (e) {
+      logWarning("recovery", `git rev-parse check failed: ${(e as Error).message}`);
       return true;
     }
 
@@ -92,8 +94,9 @@ export function hasImplementationArtifacts(basePath: string): boolean {
     // implementation code (#1703).
     const implFiles = changedFiles.filter(f => !f.startsWith(".gsd/") && !f.startsWith(".gsd\\"));
     return implFiles.length > 0;
-  } catch {
+  } catch (e) {
     // Non-fatal — if git operations fail, don't block the pipeline
+    logWarning("recovery", `implementation artifact check failed: ${(e as Error).message}`);
     return true;
   }
 }
@@ -111,7 +114,7 @@ function detectMainBranch(basePath: string): string {
     if (result.trim()) return "main";
   } catch (err) {
     // main doesn't exist
-    process.stderr.write(`gsd [auto-recovery]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    logWarning("recovery", `main branch not found: ${err instanceof Error ? err.message : String(err)}`);
   }
   try {
     const result = execFileSync("git", ["rev-parse", "--verify", "master"], {
@@ -122,7 +125,7 @@ function detectMainBranch(basePath: string): string {
     if (result.trim()) return "master";
   } catch (err) {
     // master doesn't exist either
-    process.stderr.write(`gsd [auto-recovery]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    logWarning("recovery", `master branch not found: ${err instanceof Error ? err.message : String(err)}`);
   }
   return "main"; // default fallback
 }
@@ -148,7 +151,7 @@ function getChangedFilesSinceBranch(basePath: string, targetBranch: string): str
     }
   } catch (err) {
     // merge-base failed — fall back
-    process.stderr.write(`gsd [auto-recovery]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    logWarning("recovery", `merge-base detection failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   // Fallback: check last 20 commits
@@ -158,7 +161,8 @@ function getChangedFilesSinceBranch(basePath: string, targetBranch: string): str
       { cwd: basePath, stdio: ["ignore", "pipe", "pipe"], encoding: "utf-8" },
     ).trim();
     return result ? [...new Set(result.split("\n").filter(Boolean))] : [];
-  } catch {
+  } catch (e) {
+    logWarning("recovery", `git log fallback failed: ${(e as Error).message}`);
     return [];
   }
 }
@@ -251,7 +255,7 @@ export function verifyExpectedArtifact(
       }
     } catch (err) {
       // DB unavailable — treat as verified to avoid blocking
-      process.stderr.write(`gsd [auto-recovery]: dispatch failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      logWarning("recovery", `gate-evaluate DB check failed: ${err instanceof Error ? err.message : String(err)}`);
     }
     return true;
   }
@@ -341,7 +345,7 @@ export function verifyExpectedArtifact(
         }
       } catch (err) {
         // Parse failure — don't block; slice plan may have non-standard format
-        process.stderr.write(`gsd [auto-recovery]: operation failed: ${err instanceof Error ? err.message : String(err)}\n`);
+        logWarning("recovery", `plan-slice task plan verification failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
   }
@@ -371,7 +375,8 @@ export function verifyExpectedArtifact(
             const roadmap = parseLegacyRoadmap(roadmapContent);
             const slice = roadmap.slices.find((s) => s.id === sid);
             if (slice && !slice.done) return false;
-          } catch {
+          } catch (e) {
+            logWarning("recovery", `roadmap parse failed: ${(e as Error).message}`);
             return false;
           }
         }
@@ -424,7 +429,7 @@ export function writeBlockerPlaceholder(
     const { milestone: mid, slice: sid, task: tid } = parseUnitId(unitId);
     if (mid && sid && tid) {
       try { updateTaskStatus(mid, sid, tid, "complete", new Date().toISOString()); } catch (err) { /* non-fatal */
-        process.stderr.write(`gsd [auto-recovery]: DB status update failed: ${err instanceof Error ? err.message : String(err)}\n`);
+        logError("recovery", `DB status update failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
   }
@@ -448,21 +453,21 @@ function abortAndResetMerge(
       nativeMergeAbort(basePath);
     } catch (err) {
       /* best-effort */
-      process.stderr.write(`gsd [auto-recovery]: git merge-abort failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      logWarning("recovery", `git merge-abort failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   } else if (squashMsgPath) {
     try {
       unlinkSync(squashMsgPath);
     } catch (err) {
       /* best-effort */
-      process.stderr.write(`gsd [auto-recovery]: file unlink failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      logWarning("recovery", `file unlink failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
   try {
     nativeResetHard(basePath);
   } catch (err) {
     /* best-effort */
-    process.stderr.write(`gsd [auto-recovery]: git reset failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    logError("recovery", `git reset failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -510,7 +515,8 @@ export function reconcileMergeState(
       try {
         nativeCheckoutTheirs(basePath, gsdConflicts);
         nativeAddPaths(basePath, gsdConflicts);
-      } catch {
+      } catch (e) {
+        logError("recovery", `auto-resolve .gsd/ conflicts failed: ${(e as Error).message}`);
         resolved = false;
       }
       if (resolved) {
@@ -523,7 +529,8 @@ export function reconcileMergeState(
             `Auto-resolved ${gsdConflicts.length} .gsd/ state file conflict(s) from prior merge.`,
             "info",
           );
-        } catch {
+        } catch (e) {
+          logError("recovery", `auto-commit .gsd/ conflict resolution failed: ${(e as Error).message}`);
           resolved = false;
         }
       }

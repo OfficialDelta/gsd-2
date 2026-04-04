@@ -33,6 +33,7 @@ import { renderPlanCheckboxes } from "../markdown-renderer.js";
 import { renderAllProjections, renderSummaryContent } from "../workflow-projections.js";
 import { writeManifest } from "../workflow-manifest.js";
 import { appendEvent } from "../workflow-events.js";
+import { logWarning } from "../workflow-logger.js";
 
 export interface CompleteTaskResult {
   taskId: string;
@@ -210,9 +211,7 @@ export async function handleCompleteTask(
     }
   } catch (renderErr) {
     // Disk render failed — roll back DB status so state stays consistent
-    process.stderr.write(
-      `gsd-db: complete_task — disk render failed, rolling back DB status: ${(renderErr as Error).message}\n`,
-    );
+    logWarning("tool", `complete_task — disk render failed, rolling back DB status: ${(renderErr as Error).message}`);
     // Delete orphaned verification_evidence rows first (FK constraint
     // references tasks, so evidence must go before status change).
     // Without this, retries accumulate duplicate evidence rows (#2724).
@@ -243,9 +242,7 @@ export async function handleCompleteTask(
       trigger_reason: params.triggerReason,
     });
   } catch (hookErr) {
-    process.stderr.write(
-      `gsd: complete-task post-mutation hook warning: ${(hookErr as Error).message}\n`,
-    );
+    logWarning("tool", `complete-task post-mutation hook warning: ${(hookErr as Error).message}`);
   }
 
   return {

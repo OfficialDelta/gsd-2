@@ -19,6 +19,7 @@ import { parse as parseYaml } from "yaml";
 import type { PostUnitHookConfig, PreDispatchHookConfig, TokenProfile } from "./types.js";
 import type { DynamicRoutingConfig } from "./model-router.js";
 import { normalizeStringArray } from "../shared/format-utils.js";
+import { logWarning } from "./workflow-logger.js";
 import { resolveProfileDefaults as _resolveProfileDefaults } from "./preferences-models.js";
 
 import {
@@ -237,7 +238,7 @@ function parseFrontmatterBlock(frontmatter: string): GSDPreferences {
     }
     return parsed as GSDPreferences;
   } catch (e) {
-    console.error("[parseFrontmatterBlock] YAML parse error:", e);
+    logWarning("guided", `YAML parse error in frontmatter block: ${(e as Error).message}`);
     return {} as GSDPreferences;
   }
 }
@@ -296,8 +297,8 @@ function parseHeadingListFormat(content: string): GSDPreferences {
       }
 
       typed[targetSection] = value;
-    } catch {
-      /* malformed section — skip */
+    } catch (e) {
+      logWarning("guided", `preferences section parse failed: ${(e as Error).message}`);
     }
   }
 

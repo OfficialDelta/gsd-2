@@ -33,7 +33,20 @@ export type LogComponent =
   | "compaction"    // Event compaction
   | "reconcile"     // Worktree reconciliation
   | "db"            // Database operations (gsd-db)
-  | "dispatch";     // Auto-dispatch rule evaluation
+  | "dispatch"      // Auto-dispatch rule evaluation
+  | "recovery"      // Auto-recovery and timeout recovery
+  | "session"       // Session lock and session state I/O
+  | "prompt"        // Prompt construction and context injection
+  | "dashboard"     // Auto-dashboard rendering
+  | "timer"         // Auto-timers (idle watchdog, hard timeout)
+  | "worktree"      // Worktree lifecycle (create, sync, merge)
+  | "command"       // Slash command execution and maintenance
+  | "parallel"      // Parallel orchestrator and merge
+  | "fs"            // Safe filesystem operations
+  | "bootstrap"     // Extension bootstrap (system-context, agent-end)
+  | "guided"        // Guided flow (discuss, plan wizards)
+  | "registry"      // Rule registry hook state
+  | "renderer";     // Markdown renderer and projections
 
 export interface LogEntry {
   ts: string;

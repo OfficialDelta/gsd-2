@@ -455,8 +455,8 @@ function parseEventBlock(block: string): WorkflowEvent[] {
           if (paramsMatch) {
             try {
               params = JSON.parse(paramsMatch[1]!) as Record<string, unknown>;
-            } catch {
-              // Keep empty params on parse error
+            } catch (e) {
+              logWarning("reconcile", `tool call params parse failed: ${(e as Error).message}`);
             }
             i++; // consume params line
           }
