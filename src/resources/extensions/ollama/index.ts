@@ -17,19 +17,10 @@
  */
 
 import { importExtensionModule, type ExtensionAPI } from "@gsd/pi-coding-agent";
-import type { OpenAICompletionsCompat } from "@gsd/pi-ai";
 import * as client from "./ollama-client.js";
-import { discoverModels, getOllamaOpenAIBaseUrl } from "./ollama-discovery.js";
+import { discoverModels } from "./ollama-discovery.js";
 import { registerOllamaCommands } from "./ollama-commands.js";
-
-/** Default compat settings for Ollama models via OpenAI-compat endpoint */
-const OLLAMA_COMPAT: OpenAICompletionsCompat = {
-	supportsDeveloperRole: false,
-	supportsReasoningEffort: false,
-	supportsUsageInStreaming: false,
-	maxTokensField: "max_tokens",
-	supportsStore: false,
-};
+import { streamOllamaChat } from "./ollama-chat-provider.js";
 
 let toolsPromise: Promise<void> | null = null;
 
@@ -68,12 +59,13 @@ async function probeAndRegister(pi: ExtensionAPI): Promise<boolean> {
 	const models = await discoverModels();
 	if (models.length === 0) return true; // Running but no models pulled
 
-	const baseUrl = getOllamaOpenAIBaseUrl();
+	const baseUrl = client.getOllamaHost();
 
 	pi.registerProvider("ollama", {
 		authMode: "none",
 		baseUrl,
-		api: "openai-completions",
+		api: "ollama-chat",
+		streamSimple: streamOllamaChat,
 		isReady: () => true,
 		models: models.map((m) => ({
 			id: m.id,
@@ -83,7 +75,7 @@ async function probeAndRegister(pi: ExtensionAPI): Promise<boolean> {
 			cost: m.cost,
 			contextWindow: m.contextWindow,
 			maxTokens: m.maxTokens,
-			compat: OLLAMA_COMPAT,
+			providerOptions: (m.ollamaOptions ?? {}) as Record<string, unknown>,
 		})),
 	});
 

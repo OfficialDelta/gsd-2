@@ -742,6 +742,7 @@ export class ModelRegistry {
 					maxTokens: modelDef.maxTokens,
 					headers,
 					compat: modelDef.compat,
+					providerOptions: modelDef.providerOptions,
 				} as Model<Api>);
 			}
 
@@ -917,5 +918,6 @@ export interface ProviderConfigInput {
 		maxTokens: number;
 		headers?: Record<string, string>;
 		compat?: Model<Api>["compat"];
+		providerOptions?: Record<string, unknown>;
 	}>;
 }
