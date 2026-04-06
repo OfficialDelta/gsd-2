@@ -275,14 +275,19 @@ function _withLock<T>(basePath: string, fn: () => T): T {
     }
   }
 
+  // Only run the mutation if we actually own the lock
+  const ownsLock = fd !== null;
   try {
-    // Write our PID timestamp into the lock for stale detection
-    if (fd !== null) {
+    if (ownsLock && fd !== null) {
+      // Write our PID timestamp into the lock for stale detection
       writeFileSync(lockPath, String(Date.now()), "utf-8");
       closeSync(fd);
     }
     return fn();
   } finally {
-    try { unlinkSync(lockPath); } catch { /* best-effort cleanup */ }
+    // Only delete the lock if we created it — never remove another process's lock
+    if (ownsLock) {
+      try { unlinkSync(lockPath); } catch { /* best-effort cleanup */ }
+    }
   }
 }
