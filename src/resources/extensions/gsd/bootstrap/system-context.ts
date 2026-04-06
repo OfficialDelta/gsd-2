@@ -264,6 +264,13 @@ function buildWorktreeContextBlock(): string {
   return "";
 }
 
+/**
+ * Low-entropy resume intent patterns — short phrases a user types to
+ * continue work after a pause, rate limit, or context reset (#3615).
+ * Tested against the trimmed, lowercased prompt with trailing punctuation stripped.
+ */
+const RESUME_INTENT_PATTERNS = /^(continue|resume|ok|go|go ahead|proceed|keep going|carry on|next|yes|yeah|yep|sure|do it|let's go|pick up where you left off)$/;
+
 async function buildGuidedExecuteContextInjection(prompt: string, basePath: string): Promise<string | null> {
   const executeMatch = prompt.match(/Execute the next task:\s+(T\d+)\s+\("([^"]+)"\)\s+in slice\s+(S\d+)\s+of milestone\s+(M\d+(?:-[a-z0-9]{6})?)/i);
   if (executeMatch) {
@@ -277,6 +284,27 @@ async function buildGuidedExecuteContextInjection(prompt: string, basePath: stri
     const state = await deriveState(basePath);
     if (state.activeMilestone?.id === milestoneId && state.activeSlice?.id === sliceId && state.activeTask) {
       return buildTaskExecutionContextInjection(basePath, milestoneId, sliceId, state.activeTask.id, state.activeTask.title);
+    }
+  }
+
+  // Fallback: low-entropy resume prompt (e.g., "continue", "ok", "go ahead")
+  // during an active executing task — inject task context so the agent
+  // doesn't rebuild from scratch (#3615).
+  // Intent-gated: only fire for short, resume-like prompts to avoid hijacking
+  // control/help/diagnostic prompts with unrelated execution context.
+  // Phase-gated: only fire during "executing" to avoid misrouting during
+  // replanning, gate evaluation, or other non-execution phases.
+  const trimmed = prompt.trim().toLowerCase().replace(/[.!?,]+$/g, "");
+  if (RESUME_INTENT_PATTERNS.test(trimmed)) {
+    const state = await deriveState(basePath);
+    if (state.phase === "executing" && state.activeTask && state.activeMilestone && state.activeSlice) {
+      return buildTaskExecutionContextInjection(
+        basePath,
+        state.activeMilestone.id,
+        state.activeSlice.id,
+        state.activeTask.id,
+        state.activeTask.title,
+      );
     }
   }
 
