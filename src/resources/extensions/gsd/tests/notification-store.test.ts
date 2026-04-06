@@ -2,7 +2,7 @@
 
 import { describe, test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, rmSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, readFileSync, existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -245,5 +245,38 @@ describe("notification-store", () => {
     clearNotifications();
     assert.equal(getUnreadCount(), 0);
     assert.equal(getLineCount(), 0);
+  });
+
+  test("markAllRead does not delete a foreign lock file", () => {
+    initNotificationStore(tmp);
+    appendNotification("msg1", "info");
+
+    // Simulate another process holding the lock
+    const lockPath = join(tmp, ".gsd", "notifications.lock");
+    writeFileSync(lockPath, String(Date.now()), "utf-8");
+
+    // markAllRead should still work (best-effort) but not delete the foreign lock
+    markAllRead();
+
+    assert.ok(existsSync(lockPath), "foreign lock file should not be deleted");
+
+    // Clean up the lock so afterEach doesn't leave artifacts
+    rmSync(lockPath, { force: true });
+  });
+
+  test("clearNotifications does not delete a foreign lock file", () => {
+    initNotificationStore(tmp);
+    appendNotification("msg1", "info");
+
+    // Simulate another process holding the lock
+    const lockPath = join(tmp, ".gsd", "notifications.lock");
+    writeFileSync(lockPath, String(Date.now()), "utf-8");
+
+    // clearNotifications should still work but not delete the foreign lock
+    clearNotifications();
+
+    assert.ok(existsSync(lockPath), "foreign lock file should not be deleted");
+
+    rmSync(lockPath, { force: true });
   });
 });
