@@ -108,7 +108,10 @@ export function registerHooks(pi: ExtensionAPI): void {
   });
 
   pi.on("session_before_compact", async () => {
-    if (isAutoActive() || isAutoPaused()) {
+    // Only cancel compaction while auto-mode is actively running.
+    // Paused auto-mode should allow compaction — the user may be doing
+    // interactive work (#3165).
+    if (isAutoActive()) {
       return { cancel: true };
     }
     const basePath = process.cwd();

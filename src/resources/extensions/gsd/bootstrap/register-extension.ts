@@ -36,7 +36,10 @@ function installEpipeGuard(): void {
       if (handleRecoverableExtensionProcessError(err)) {
         return;
       }
-      throw err;
+      // Log unhandled errors instead of re-throwing — throwing inside an
+      // uncaughtException handler is a fatal double-fault in Node.js (#3163).
+      process.stderr.write(`[gsd] uncaught extension error (non-fatal): ${err.message}\n`);
+      if (err.stack) process.stderr.write(`${err.stack}\n`);
     };
     process.on("uncaughtException", _gsdEpipeGuard);
   }
