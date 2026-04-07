@@ -188,8 +188,10 @@ function clearProjectRootStateFiles(basePath: string, milestoneId: string): void
     try {
       unlinkSync(file);
     } catch (err) {
-      /* non-fatal — file may not exist */
-      logWarning("worktree", `file unlink failed: ${err instanceof Error ? err.message : String(err)}`);
+      // ENOENT is expected — file may not exist (#3597)
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+        logWarning("worktree", `file unlink failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
   }
 
@@ -218,8 +220,11 @@ function clearProjectRootStateFiles(basePath: string, milestoneId: string): void
             try {
               unlinkSync(join(basePath, f));
             } catch (err) {
-              /* non-fatal */
-              logWarning("worktree", `untracked file unlink failed: ${err instanceof Error ? err.message : String(err)}`);
+              // ENOENT/EISDIR are expected for already-removed or directory entries (#3597)
+              const code = (err as NodeJS.ErrnoException).code;
+              if (code !== "ENOENT" && code !== "EISDIR") {
+                logWarning("worktree", `untracked file unlink failed: ${err instanceof Error ? err.message : String(err)}`);
+              }
             }
           }
         }

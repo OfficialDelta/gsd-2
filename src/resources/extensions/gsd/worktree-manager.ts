@@ -89,7 +89,9 @@ function normalizePathForComparison(path: string): string {
  */
 export function resolveGitDir(basePath: string): string {
   const gitPath = join(basePath, ".git");
-  if (!existsSync(gitPath)) return join(basePath, ".git");
+  if (!existsSync(gitPath)) return gitPath;
+  // In a normal repo .git is a directory — skip the file read (#3597)
+  if (lstatSync(gitPath).isDirectory()) return gitPath;
   try {
     const content = readFileSync(gitPath, "utf-8").trim();
     if (content.startsWith("gitdir: ")) {
@@ -98,7 +100,7 @@ export function resolveGitDir(basePath: string): string {
   } catch (e) {
     logWarning("worktree", `.git file read failed: ${(e as Error).message}`);
   }
-  return join(basePath, ".git");
+  return gitPath;
 }
 
 export function worktreesDir(basePath: string): string {
