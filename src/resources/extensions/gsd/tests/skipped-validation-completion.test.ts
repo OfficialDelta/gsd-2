@@ -28,7 +28,7 @@ describe('skipped validation completion (#3698)', () => {
   });
 
   test('regex matches skip-by-preference patterns', () => {
-    assert.match(autoDispatchSrc, /skip(?:ped)?\[\\s\\-\]\+(?:by\|per\|due to)/,
+    assert.match(autoDispatchSrc, /skip\(\?:ped\)\?\[\\s\\-\]\+\(\?:by\|per\|due to\)/,
       'should have regex matching "skipped by/per/due to" patterns');
   });
 
