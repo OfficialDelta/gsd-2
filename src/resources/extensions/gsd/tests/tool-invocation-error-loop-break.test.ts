@@ -44,7 +44,7 @@ describe("#2883: tool invocation error tracking on AutoSession", () => {
 
 // ─── isToolInvocationError classifier ────────────────────────────────────
 
-import { isToolInvocationError } from "../auto-tool-tracking.ts";
+import { isToolInvocationError, isQueuedUserMessageSkip } from "../auto-tool-tracking.ts";
 
 describe("#2883: isToolInvocationError classification", () => {
   test("detects JSON validation failure pattern", () => {
@@ -99,5 +99,33 @@ describe("#2883: isToolInvocationError classification", () => {
 
   test("returns false for network errors (handled elsewhere)", () => {
     assert.equal(isToolInvocationError("ECONNRESET"), false);
+  });
+});
+
+// ─── isQueuedUserMessageSkip classifier (#3595) ─────────────────────────
+
+describe("#3595: isQueuedUserMessageSkip classification", () => {
+  test("detects exact skip message with period", () => {
+    assert.equal(isQueuedUserMessageSkip("Skipped due to queued user message."), true);
+  });
+
+  test("detects skip message without period", () => {
+    assert.equal(isQueuedUserMessageSkip("Skipped due to queued user message"), true);
+  });
+
+  test("detects skip message with surrounding whitespace", () => {
+    assert.equal(isQueuedUserMessageSkip("  Skipped due to queued user message.  "), true);
+  });
+
+  test("returns false for normal tool errors", () => {
+    assert.equal(isQueuedUserMessageSkip("Slice S01 is already complete"), false);
+  });
+
+  test("returns false for empty string", () => {
+    assert.equal(isQueuedUserMessageSkip(""), false);
+  });
+
+  test("returns false for partial match (substring)", () => {
+    assert.equal(isQueuedUserMessageSkip("Error: Skipped due to queued user message. Retry later."), false);
   });
 });

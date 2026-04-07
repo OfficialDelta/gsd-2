@@ -589,11 +589,14 @@ export async function postUnitPreVerification(pctx: PostUnitContext, opts?: PreV
           "error",
         );
       } else if (!triggerArtifactVerified) {
-        // #2883: If the artifact is missing because the tool invocation itself
-        // failed (malformed/truncated JSON arguments), retrying will produce the
-        // same failure. Pause auto-mode instead of entering a stuck retry loop.
+        // #2883/#3595: If the artifact is missing because the tool invocation
+        // failed (malformed JSON) or was skipped (queued user message), retrying
+        // will produce the same failure. Pause auto-mode instead of looping.
         if (s.lastToolInvocationError) {
-          const errMsg = `Tool invocation failed for ${s.currentUnit.type}: ${s.lastToolInvocationError}. Structured argument generation failed — pausing auto-mode.`;
+          const isUserSkip = /queued user message/i.test(s.lastToolInvocationError);
+          const errMsg = isUserSkip
+            ? `Tool skipped for ${s.currentUnit.type}: ${s.lastToolInvocationError}. Queued user message interrupted the turn — pausing auto-mode.`
+            : `Tool invocation failed for ${s.currentUnit.type}: ${s.lastToolInvocationError}. Structured argument generation failed — pausing auto-mode.`;
           debugLog("postUnit", { phase: "tool-invocation-error-pause", unitType: s.currentUnit.type, unitId: s.currentUnit.id, error: s.lastToolInvocationError });
           ctx.ui.notify(errMsg, "error");
           s.lastToolInvocationError = null;

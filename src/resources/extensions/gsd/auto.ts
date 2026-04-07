@@ -76,6 +76,7 @@ import {
   hasInteractiveToolInFlight,
   clearInFlightTools,
   isToolInvocationError,
+  isQueuedUserMessageSkip,
 } from "./auto-tool-tracking.js";
 import { closeoutUnit } from "./auto-unit-closeout.js";
 import { recoverTimedOutUnit } from "./auto-timeout-recovery.js";
@@ -397,7 +398,7 @@ export function markToolEnd(toolCallId: string): void {
  */
 export function recordToolInvocationError(toolName: string, errorMsg: string): void {
   if (!s.active) return;
-  if (isToolInvocationError(errorMsg)) {
+  if (isToolInvocationError(errorMsg) || isQueuedUserMessageSkip(errorMsg)) {
     s.lastToolInvocationError = `${toolName}: ${errorMsg}`;
   }
 }

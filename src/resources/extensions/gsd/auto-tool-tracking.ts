@@ -102,3 +102,13 @@ export function isToolInvocationError(errorMsg: string): boolean {
   if (!errorMsg) return false;
   return TOOL_INVOCATION_ERROR_RE.test(errorMsg);
 }
+
+/**
+ * Returns true if the error message indicates the tool was skipped because
+ * a queued user message interrupted the turn (#3595).  Retrying will produce
+ * the same skip, so the unit should be paused rather than retried.
+ */
+export function isQueuedUserMessageSkip(errorMsg: string): boolean {
+  if (!errorMsg) return false;
+  return /^Skipped due to queued user message\.?$/i.test(errorMsg.trim());
+}
