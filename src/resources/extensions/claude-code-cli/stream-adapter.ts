@@ -50,6 +50,17 @@ function createAssistantStream(): AssistantMessageEventStream {
 
 let cachedClaudePath: string | null = null;
 
+export function getClaudeLookupCommand(platform: NodeJS.Platform = process.platform): string {
+	return platform === "win32" ? "where claude" : "which claude";
+}
+
+export function parseClaudeLookupOutput(output: Buffer | string): string {
+	return output
+		.toString()
+		.trim()
+		.split(/\r?\n/)[0] ?? "";
+}
+
 /**
  * Resolve the path to the system-installed `claude` binary.
  * The SDK defaults to a bundled cli.js which doesn't exist when
@@ -58,9 +69,7 @@ let cachedClaudePath: string | null = null;
 function getClaudePath(): string {
 	if (cachedClaudePath) return cachedClaudePath;
 	try {
-		cachedClaudePath = execSync("which claude", { timeout: 5_000, stdio: "pipe" })
-			.toString()
-			.trim();
+		cachedClaudePath = parseClaudeLookupOutput(execSync(getClaudeLookupCommand(), { timeout: 5_000, stdio: "pipe" }));
 	} catch {
 		cachedClaudePath = "claude"; // fall back to PATH resolution
 	}

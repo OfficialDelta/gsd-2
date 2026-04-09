@@ -4,6 +4,8 @@ import {
 	makeStreamExhaustedErrorMessage,
 	buildPromptFromContext,
 	buildSdkOptions,
+	getClaudeLookupCommand,
+	parseClaudeLookupOutput,
 } from "../stream-adapter.ts";
 import type { Context, Message } from "@gsd/pi-ai";
 
@@ -124,5 +126,21 @@ describe("stream-adapter — session persistence (#2859)", () => {
 			Array.isArray(opusOpts.betas) && opusOpts.betas.length === 0,
 			"non-sonnet models should have empty betas",
 		);
+	});
+});
+
+describe("stream-adapter — Windows Claude path lookup (#3770)", () => {
+	test("getClaudeLookupCommand uses where on Windows", () => {
+		assert.equal(getClaudeLookupCommand("win32"), "where claude");
+	});
+
+	test("getClaudeLookupCommand uses which on non-Windows platforms", () => {
+		assert.equal(getClaudeLookupCommand("darwin"), "which claude");
+		assert.equal(getClaudeLookupCommand("linux"), "which claude");
+	});
+
+	test("parseClaudeLookupOutput keeps the first native path from multi-line lookup output", () => {
+		const output = "C:\\Users\\Binoy\\.local\\bin\\claude.exe\r\nC:\\Program Files\\Claude\\claude.exe\r\n";
+		assert.equal(parseClaudeLookupOutput(output), "C:\\Users\\Binoy\\.local\\bin\\claude.exe");
 	});
 });
