@@ -53,7 +53,7 @@ gsd
 
 GSD displays a welcome screen showing your version, active model, and available tool keys. Then on first launch, it runs a setup wizard:
 
-1. **LLM Provider** — select from 20+ providers (Anthropic, OpenAI, Google, OpenRouter, GitHub Copilot, Amazon Bedrock, Azure, and more). OAuth flows handle Claude Max and Copilot subscriptions automatically; otherwise paste an API key.
+1. **LLM Provider** — select from 20+ providers (Anthropic, OpenAI, Google, OpenRouter, GitHub Copilot, Amazon Bedrock, Azure, and more). Paste an API key, or use OAuth for supported providers like GitHub Copilot. Claude subscription users should authenticate through the local Claude Code CLI.
 2. **Tool API Keys** (optional) — Brave Search, Context7, Jina, Slack, Discord. Press Enter to skip any.
 
 If you have an existing Pi installation, provider credentials are imported automatically.

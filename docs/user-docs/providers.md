@@ -30,7 +30,7 @@ Step-by-step setup instructions for every LLM provider GSD supports. If you ran 
 
 | Provider | Auth Method | Env Variable | Config File |
 |----------|-------------|-------------|-------------|
-| Anthropic | OAuth or API key | `ANTHROPIC_API_KEY` | — |
+| Anthropic | API key | `ANTHROPIC_API_KEY` | — |
 | OpenAI | API key | `OPENAI_API_KEY` | — |
 | Google Gemini | API key | `GEMINI_API_KEY` | — |
 | OpenRouter | API key | `OPENROUTER_API_KEY` | Optional `models.json` |
@@ -55,24 +55,30 @@ Built-in providers have models pre-registered in GSD. You only need to supply cr
 
 **Recommended.** Anthropic models have the deepest integration: built-in web search, extended thinking, and prompt caching.
 
-**Option A — Browser sign-in (recommended):**
-
-```bash
-gsd config
-# Choose "Sign in with your browser" → "Anthropic (Claude)"
-```
-
-Or inside a session: `/login`
-
-**Option B — API key:**
+**Option A — API key (recommended):**
 
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
-Or paste it during `gsd config` when prompted.
+Or run `gsd config` and paste your key when prompted.
 
 **Get a key:** [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
+
+**Option B — Claude Code CLI:**
+
+If you have a Claude Pro or Max subscription, you can authenticate through Anthropic's official Claude Code CLI. Install it, sign in with `claude`, then GSD will detect and route through it automatically:
+
+```bash
+# Install Claude Code CLI (see https://docs.anthropic.com/en/docs/claude-code)
+claude
+# Sign in when prompted, then start GSD
+gsd
+```
+
+GSD detects your local Claude Code installation and uses it as the authenticated Anthropic surface. This is the TOS-compliant path for subscription users — GSD never handles your subscription credentials directly.
+
+> **Note:** GSD does not support browser-based OAuth sign-in for Anthropic. Use an API key or the Claude Code CLI instead.
 
 ### OpenAI
 

@@ -348,7 +348,7 @@ test("boot and onboarding routes expose locked required state plus explicitly sk
   ]);
   const anthropicProvider = bootPayload.onboarding.required.providers.find((provider: any) => provider.id === "anthropic");
   assert.equal(anthropicProvider.supports.apiKey, true);
-  assert.equal(anthropicProvider.supports.oauthAvailable, true);
+  assert.equal(anthropicProvider.supports.oauthAvailable, false);
 
   const onboardingResponse = await onboardingRoute.GET(projectRequest(fixture.projectCwd, "/api/onboarding"));
   assert.equal(onboardingResponse.status, 200);
