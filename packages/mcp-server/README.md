@@ -234,7 +234,7 @@ Resolve a pending blocker in a session by sending a response to the blocked UI r
 | `GSD_CLI_PATH` | Absolute path to the GSD CLI binary. If not set, the server resolves `gsd` via `which`. |
 | `GSD_WORKFLOW_EXECUTORS_MODULE` | Optional absolute path or `file:` URL for the shared GSD workflow executor module used by workflow mutation tools. |
 
-The server also hydrates supported tool credentials from `~/.gsd/agent/auth.json` on startup. Keys saved through `/gsd config` become available to the MCP server process automatically, and any explicitly-set environment variable still wins.
+The server also hydrates supported model-provider and tool credentials from `~/.gsd/agent/auth.json` on startup. Keys saved through `/gsd config` or `/gsd keys` become available to the MCP server process automatically, and any explicitly-set environment variable still wins.
 
 ## Architecture
 

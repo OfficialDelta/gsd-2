@@ -7,12 +7,12 @@
 
 import { SessionManager } from './session-manager.js';
 import { createMcpServer } from './server.js';
-import { loadStoredToolEnvKeys } from './tool-credentials.js';
+import { loadStoredCredentialEnvKeys } from './tool-credentials.js';
 
 const MCP_PKG = '@modelcontextprotocol/sdk';
 
 async function main(): Promise<void> {
-  loadStoredToolEnvKeys();
+  loadStoredCredentialEnvKeys();
 
   const sessionManager = new SessionManager();
 

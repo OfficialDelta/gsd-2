@@ -8,7 +8,28 @@ type AuthCredential =
 
 type AuthStorageData = Record<string, AuthCredential>;
 
-const TOOL_ENV_KEYS = [
+const AUTH_ENV_KEYS = [
+  ["anthropic", "ANTHROPIC_API_KEY"],
+  ["openai", "OPENAI_API_KEY"],
+  ["github-copilot", "GITHUB_TOKEN"],
+  ["google", "GEMINI_API_KEY"],
+  ["groq", "GROQ_API_KEY"],
+  ["xai", "XAI_API_KEY"],
+  ["openrouter", "OPENROUTER_API_KEY"],
+  ["mistral", "MISTRAL_API_KEY"],
+  ["ollama-cloud", "OLLAMA_API_KEY"],
+  ["custom-openai", "CUSTOM_OPENAI_API_KEY"],
+  ["cerebras", "CEREBRAS_API_KEY"],
+  ["azure-openai-responses", "AZURE_OPENAI_API_KEY"],
+  ["vercel-ai-gateway", "AI_GATEWAY_API_KEY"],
+  ["zai", "ZAI_API_KEY"],
+  ["minimax", "MINIMAX_API_KEY"],
+  ["minimax-cn", "MINIMAX_CN_API_KEY"],
+  ["huggingface", "HF_TOKEN"],
+  ["opencode", "OPENCODE_API_KEY"],
+  ["opencode-go", "OPENCODE_API_KEY"],
+  ["kimi-coding", "KIMI_API_KEY"],
+  ["alibaba-coding-plan", "ALIBABA_API_KEY"],
   ["brave", "BRAVE_API_KEY"],
   ["brave_answers", "BRAVE_ANSWERS_KEY"],
   ["context7", "CONTEXT7_API_KEY"],
@@ -17,9 +38,6 @@ const TOOL_ENV_KEYS = [
   ["slack_bot", "SLACK_BOT_TOKEN"],
   ["discord_bot", "DISCORD_BOT_TOKEN"],
   ["telegram_bot", "TELEGRAM_BOT_TOKEN"],
-  ["groq", "GROQ_API_KEY"],
-  ["ollama-cloud", "OLLAMA_API_KEY"],
-  ["custom-openai", "CUSTOM_OPENAI_API_KEY"],
 ] as const;
 
 function expandHome(pathValue: string): string {
@@ -48,7 +66,7 @@ export function resolveAuthPath(env: NodeJS.ProcessEnv = process.env): string {
   return join(homedir(), ".gsd", "agent", "auth.json");
 }
 
-export function loadStoredToolEnvKeys(options: {
+export function loadStoredCredentialEnvKeys(options: {
   env?: NodeJS.ProcessEnv;
   authPath?: string;
 } = {}): string[] {
@@ -67,7 +85,7 @@ export function loadStoredToolEnvKeys(options: {
   }
 
   const loaded: string[] = [];
-  for (const [providerId, envVar] of TOOL_ENV_KEYS) {
+  for (const [providerId, envVar] of AUTH_ENV_KEYS) {
     if (env[envVar]) continue;
     const key = getStoredApiKey(parsed, providerId);
     if (!key) continue;
