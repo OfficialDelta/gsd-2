@@ -45,6 +45,8 @@ export function registerHooks(pi: ExtensionAPI): void {
     resetToolCallLoopGuard();
     resetAskUserQuestionsCache();
     await syncServiceTierStatus(ctx);
+    const { prepareWorkflowMcpForProject } = await import("../workflow-mcp-auto-prep.js");
+    prepareWorkflowMcpForProject(ctx, process.cwd());
 
     // Apply show_token_cost preference (#1515)
     try {
@@ -85,6 +87,8 @@ export function registerHooks(pi: ExtensionAPI): void {
     resetAskUserQuestionsCache();
     clearDiscussionFlowState();
     await syncServiceTierStatus(ctx);
+    const { prepareWorkflowMcpForProject } = await import("../workflow-mcp-auto-prep.js");
+    prepareWorkflowMcpForProject(ctx, process.cwd());
     loadToolApiKeys();
   });
 

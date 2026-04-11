@@ -217,6 +217,35 @@ describe("stream-adapter — session persistence (#2859)", () => {
 			assert.equal(srv.env.GSD_CLI_PATH, "/tmp/gsd");
 			assert.equal(srv.env.GSD_PERSIST_WRITE_GATE_STATE, "1");
 			assert.equal(srv.env.GSD_WORKFLOW_PROJECT_ROOT, "/tmp/project");
+			assert.deepEqual(options.disallowedTools, ["AskUserQuestion"]);
+		} finally {
+			process.env.GSD_WORKFLOW_MCP_COMMAND = prev.GSD_WORKFLOW_MCP_COMMAND;
+			process.env.GSD_WORKFLOW_MCP_NAME = prev.GSD_WORKFLOW_MCP_NAME;
+			process.env.GSD_WORKFLOW_MCP_ARGS = prev.GSD_WORKFLOW_MCP_ARGS;
+			process.env.GSD_WORKFLOW_MCP_ENV = prev.GSD_WORKFLOW_MCP_ENV;
+			process.env.GSD_WORKFLOW_MCP_CWD = prev.GSD_WORKFLOW_MCP_CWD;
+		}
+	});
+
+	test("buildSdkOptions disables AskUserQuestion for custom workflow MCP server names", () => {
+		const prev = {
+			GSD_WORKFLOW_MCP_COMMAND: process.env.GSD_WORKFLOW_MCP_COMMAND,
+			GSD_WORKFLOW_MCP_NAME: process.env.GSD_WORKFLOW_MCP_NAME,
+			GSD_WORKFLOW_MCP_ARGS: process.env.GSD_WORKFLOW_MCP_ARGS,
+			GSD_WORKFLOW_MCP_ENV: process.env.GSD_WORKFLOW_MCP_ENV,
+			GSD_WORKFLOW_MCP_CWD: process.env.GSD_WORKFLOW_MCP_CWD,
+		};
+		try {
+			process.env.GSD_WORKFLOW_MCP_COMMAND = "node";
+			process.env.GSD_WORKFLOW_MCP_NAME = "custom-workflow";
+			process.env.GSD_WORKFLOW_MCP_ARGS = JSON.stringify(["packages/mcp-server/dist/cli.js"]);
+			process.env.GSD_WORKFLOW_MCP_ENV = JSON.stringify({ GSD_CLI_PATH: "/tmp/gsd" });
+			process.env.GSD_WORKFLOW_MCP_CWD = "/tmp/project";
+
+			const options = buildSdkOptions("claude-sonnet-4-20250514", "test");
+			const mcpServers = options.mcpServers as Record<string, any>;
+			assert.ok(mcpServers?.["custom-workflow"], "expected custom workflow server config");
+			assert.deepEqual(options.disallowedTools, ["AskUserQuestion"]);
 		} finally {
 			process.env.GSD_WORKFLOW_MCP_COMMAND = prev.GSD_WORKFLOW_MCP_COMMAND;
 			process.env.GSD_WORKFLOW_MCP_NAME = prev.GSD_WORKFLOW_MCP_NAME;
@@ -252,6 +281,9 @@ describe("stream-adapter — session persistence (#2859)", () => {
 			const mcpServers = (options as any).mcpServers;
 			if (mcpServers) {
 				assert.ok(mcpServers["gsd-workflow"], "if present, must be gsd-workflow");
+				assert.deepEqual((options as any).disallowedTools, ["AskUserQuestion"]);
+			} else {
+				assert.deepEqual((options as any).disallowedTools, ["AskUserQuestion"]);
 			}
 			rmSync(emptyDir, { recursive: true, force: true });
 		} finally {
@@ -298,6 +330,7 @@ describe("stream-adapter — session persistence (#2859)", () => {
 			assert.equal(srv.env.GSD_CLI_PATH, "/tmp/gsd");
 			assert.equal(srv.env.GSD_PERSIST_WRITE_GATE_STATE, "1");
 			assert.equal(srv.env.GSD_WORKFLOW_PROJECT_ROOT, resolvedRepoDir);
+			assert.deepEqual(options.disallowedTools, ["AskUserQuestion"]);
 		} finally {
 			process.chdir(originalCwd);
 			rmSync(repoDir, { recursive: true, force: true });

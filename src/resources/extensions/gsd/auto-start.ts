@@ -335,19 +335,9 @@ export async function bootstrapAutoSession(
       }
     }
 
-    if (ctx.model?.provider === "claude-code") {
-      try {
-        const { ensureProjectWorkflowMcpConfig } = await import("./mcp-project-config.js");
-        const result = ensureProjectWorkflowMcpConfig(base);
-        if (result.status !== "unchanged") {
-          ctx.ui.notify(`Claude Code MCP prepared at ${result.configPath}`, "info");
-        }
-      } catch (err) {
-        ctx.ui.notify(
-          `Claude Code MCP prep failed: ${err instanceof Error ? err.message : String(err)}`,
-          "warning",
-        );
-      }
+    {
+      const { prepareWorkflowMcpForProject } = await import("./workflow-mcp-auto-prep.js");
+      prepareWorkflowMcpForProject(ctx, base);
     }
 
     // Initialize GitServiceImpl
