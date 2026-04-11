@@ -432,12 +432,12 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 				host.streamingMessage = undefined;
 			}
 			host.pendingTools.clear();
-			// Stop spinner on pinned border and switch label from "Working · Latest Output" to "Latest Output"
+			// Pinned output is only useful while work is actively streaming.
+			// Keep chat history as the single source after completion.
 			if (pinnedBorder) {
 				pinnedBorder.stopSpinner();
-				pinnedBorder.setLabel("Latest Output");
 			}
-			// Keep pinned message visible until the next assistant turn starts.
+			host.pinnedMessageContainer.clear();
 			lastPinnedText = "";
 			hasToolsInTurn = false;
 			pinnedBorder = undefined;

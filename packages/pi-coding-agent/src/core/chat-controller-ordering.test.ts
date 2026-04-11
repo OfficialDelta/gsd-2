@@ -338,6 +338,54 @@ test("chat-controller clears pinned zone when a new assistant message starts", a
 	assert.equal(host.pinnedMessageContainer.children.length, 0, "pinned zone should clear on new assistant message");
 });
 
+test("chat-controller clears pinned zone when the agent turn ends", async () => {
+	(globalThis as any)[Symbol.for("@gsd/pi-coding-agent:theme")] = {
+		fg: (_key: string, text: string) => text,
+		bg: (_key: string, text: string) => text,
+		bold: (text: string) => text,
+		italic: (text: string) => text,
+		truncate: (text: string) => text,
+	};
+
+	const host = createHost();
+	const toolCall = {
+		type: "toolCall",
+		id: "tool-clear-on-end-1",
+		name: "exec_command",
+		arguments: { cmd: "echo hi" },
+	};
+
+	await handleAgentEvent(host, { type: "message_start", message: makeAssistant([]) } as any);
+
+	host.getMarkdownThemeWithSettings = () => ({});
+	await handleAgentEvent(
+		host,
+		{
+			type: "message_update",
+			message: makeAssistant([{ type: "text", text: "Working on it." }, toolCall]),
+			assistantMessageEvent: {
+				type: "toolcall_end",
+				contentIndex: 1,
+				toolCall: {
+					...toolCall,
+					externalResult: {
+						content: [{ type: "text", text: "ok" }],
+						details: {},
+						isError: false,
+					},
+				},
+				partial: makeAssistant([{ type: "text", text: "Working on it." }, toolCall]),
+			},
+		} as any,
+	);
+
+	assert.ok(host.pinnedMessageContainer.children.length > 0, "pinned zone should be populated before agent_end");
+
+	await handleAgentEvent(host, { type: "agent_end" } as any);
+
+	assert.equal(host.pinnedMessageContainer.children.length, 0, "pinned zone should clear on agent_end");
+});
+
 test("chat-controller does not pin when there are no tool calls", async () => {
 	(globalThis as any)[Symbol.for("@gsd/pi-coding-agent:theme")] = {
 		fg: (_key: string, text: string) => text,
