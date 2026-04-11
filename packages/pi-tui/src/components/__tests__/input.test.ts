@@ -32,4 +32,15 @@ describe("Input", () => {
 		input.focused = false;
 		assert.equal(input.focused, false);
 	});
+
+	it("secure mode obscures typed characters in render output", () => {
+		const input = new Input();
+		input.secure = true;
+		input.focused = true;
+		input.handleInput("secret123");
+
+		const line = input.render(40)[0] ?? "";
+		assert.ok(!line.includes("secret123"), "rendered line must not expose raw secret text");
+		assert.ok(line.includes("*********"), "rendered line should include masked characters");
+	});
 });
