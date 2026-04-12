@@ -8,7 +8,21 @@
         "--transport",
         "stdio"
       ],
-      "description": "repowise: codebase intelligence \u2014 docs, graph, git signals, dead code, decisions"
+      "description": "repowise: codebase intelligence — docs, graph, git signals, dead code, decisions"
+    },
+    "gsd-workflow": {
+      "command": "/Users/alanalwakeel/.nvm/versions/node/v24.14.1/bin/node",
+      "args": [
+        "/Users/alanalwakeel/.nvm/versions/node/v24.14.1/lib/node_modules/gsd-pi/packages/mcp-server/dist/cli.js"
+      ],
+      "cwd": "/Users/alanalwakeel/Documents/CodeProjects/gsd-2",
+      "env": {
+        "GSD_CLI_PATH": "/Users/alanalwakeel/.nvm/versions/node/v24.14.1/bin/gsd",
+        "GSD_WORKFLOW_EXECUTORS_MODULE": "/Users/alanalwakeel/.gsd/agent/extensions/gsd/tools/workflow-tool-executors.js",
+        "GSD_WORKFLOW_WRITE_GATE_MODULE": "/Users/alanalwakeel/.gsd/agent/extensions/gsd/bootstrap/write-gate.js",
+        "GSD_PERSIST_WRITE_GATE_STATE": "1",
+        "GSD_WORKFLOW_PROJECT_ROOT": "/Users/alanalwakeel/Documents/CodeProjects/gsd-2"
+      }
     }
   }
 }
