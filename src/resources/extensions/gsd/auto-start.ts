@@ -83,7 +83,7 @@ import { join } from "node:path";
 import { sep as pathSep } from "node:path";
 
 import { resolveProjectRootDbPath } from "./bootstrap/dynamic-tools.js";
-import { resolveDefaultSessionModel } from "./preferences-models.js";
+import { isCustomProvider, resolveDefaultSessionModel } from "./preferences-models.js";
 import type { WorktreeResolver } from "./worktree-resolver.js";
 
 export interface BootstrapDeps {
@@ -270,11 +270,24 @@ export async function bootstrapAutoSession(
   // (#3517).  The session model (ctx.model) comes from findInitialModel() which
   // reads defaultProvider/defaultModel from ~/.gsd/agent/settings.json.  When
   // the user has explicit model preferences in PREFERENCES.md, those should win.
+  //
+  // Exception: when the session model is a custom provider defined in
+  // ~/.gsd/agent/models.json (Ollama, vLLM, OpenAI-compatible proxy, etc.),
+  // the session model wins over PREFERENCES.md.  Custom providers can only be
+  // selected via `/gsd model`, which writes settings.json and therefore
+  // represents an explicit, recent user choice.  PREFERENCES.md cannot
+  // reference custom providers, so honoring it here would silently start
+  // auto-mode against a built-in provider the user is not logged into and
+  // surface as "Not logged in · Please run /login" before pausing auto-mode
+  // and resetting to claude-code/claude-sonnet-4-6 (#4122).
   const preferredModel = resolveDefaultSessionModel(ctx.model?.provider);
-  const startModelSnapshot = preferredModel
-    ?? (ctx.model
-      ? { provider: ctx.model.provider, id: ctx.model.id }
-      : null);
+  const sessionProviderIsCustom = isCustomProvider(ctx.model?.provider);
+  const startModelSnapshot = sessionProviderIsCustom && ctx.model
+    ? { provider: ctx.model.provider, id: ctx.model.id }
+    : (preferredModel
+      ?? (ctx.model
+        ? { provider: ctx.model.provider, id: ctx.model.id }
+        : null));
 
   try {
     // Validate GSD_PROJECT_ID early so the user gets immediate feedback
