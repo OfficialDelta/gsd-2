@@ -22,6 +22,28 @@ function hasAssistantToolBlocks(message: { content: Array<any> }): boolean {
 	return message.content.some((c) => c.type === "toolCall" || c.type === "serverToolUse");
 }
 
+// Pick the latest non-empty text block that appears strictly before the most
+// recent tool call. Text blocks that come after the last tool call are still
+// streaming live into the chat container, so mirroring them into the pinned
+// "Latest Output" zone would render the same tokens twice.
+export function findLatestPinnableText(contentBlocks: Array<any>): string {
+	let lastToolIdx = -1;
+	for (let i = contentBlocks.length - 1; i >= 0; i--) {
+		const c = contentBlocks[i];
+		if (c?.type === "toolCall" || c?.type === "serverToolUse") {
+			lastToolIdx = i;
+			break;
+		}
+	}
+	for (let i = lastToolIdx - 1; i >= 0; i--) {
+		const c = contentBlocks[i];
+		if (c?.type === "text" && typeof c.text === "string" && c.text.trim()) {
+			return c.text.trim();
+		}
+	}
+	return "";
+}
+
 // Tracks the latest assistant text for the pinned message zone
 let lastPinnedText = "";
 // Whether any tool execution has been added in this assistant turn (triggers pinned display)
@@ -286,26 +308,7 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 				if (hasTools) hasToolsInTurn = true;
 
 				if (hasToolsInTurn) {
-					// Mirror the latest text block that precedes the most recent tool
-					// call. Text blocks that come *after* the last tool call are still
-					// streaming live into the chat container, so mirroring them would
-					// duplicate the same tokens in two places at once.
-					let lastToolIdx = -1;
-					for (let i = contentBlocks.length - 1; i >= 0; i--) {
-						const c = contentBlocks[i] as any;
-						if (c.type === "toolCall" || c.type === "serverToolUse") {
-							lastToolIdx = i;
-							break;
-						}
-					}
-					let latestText = "";
-					for (let i = lastToolIdx - 1; i >= 0; i--) {
-						const c = contentBlocks[i] as any;
-						if (c.type === "text" && c.text?.trim()) {
-							latestText = c.text.trim();
-							break;
-						}
-					}
+					const latestText = findLatestPinnableText(contentBlocks);
 
 					if (latestText && latestText !== lastPinnedText) {
 						lastPinnedText = latestText;
