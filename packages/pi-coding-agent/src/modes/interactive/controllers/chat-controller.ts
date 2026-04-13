@@ -10,6 +10,13 @@ import { appKey } from "../components/keybinding-hints.js";
 // Tracks the last processed content index to avoid re-scanning all blocks on every message_update
 let lastProcessedContentIndex = 0;
 
+// --- Segment walker state (per streaming assistant turn) ---
+type RenderedSegment =
+	| { kind: "text-run"; startIndex: number; endIndex: number; component: AssistantMessageComponent }
+	| { kind: "tool"; contentIndex: number; component: ToolExecutionComponent };
+
+let renderedSegments: RenderedSegment[] = [];
+
 function hasVisibleAssistantContent(message: { content: Array<any> }): boolean {
 	return message.content.some(
 		(c) =>
@@ -80,6 +87,7 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 		lastProcessedContentIndex = 0;
 		lastPinnedText = "";
 		hasToolsInTurn = false;
+		renderedSegments = [];
 		if (pinnedBorder) pinnedBorder.stopSpinner();
 		pinnedBorder = undefined;
 		pinnedTextComponent = undefined;
@@ -99,6 +107,7 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 					host.pinnedMessageContainer.clear();
 					lastPinnedText = "";
 					hasToolsInTurn = false;
+					renderedSegments = [];
 					if (pinnedBorder) pinnedBorder.stopSpinner();
 					pinnedBorder = undefined;
 					pinnedTextComponent = undefined;
@@ -273,24 +282,88 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 					}
 				}
 
-				// Render assistant text/thinking after tool components so mixed
-				// streams keep chronological ordering in the chat container.
-				const hasToolBlocks = hasAssistantToolBlocks(host.streamingMessage);
-				if (!host.streamingComponent && hasVisibleAssistantContent(host.streamingMessage)) {
-					host.streamingComponent = new AssistantMessageComponent(
-						undefined,
-						host.hideThinkingBlock,
-						host.getMarkdownThemeWithSettings(),
-						host.settingsManager.getTimestampFormat(),
-					);
-					host.chatContainer.addChild(host.streamingComponent);
-				}
-				if (host.streamingComponent) {
-					if (hasToolBlocks) {
-						host.chatContainer.removeChild(host.streamingComponent);
-						host.chatContainer.addChild(host.streamingComponent);
+				// Segment walker: render content blocks in stream order, append-only.
+				// Build desired segment plan from content[].
+				{
+					const blocks = host.streamingMessage.content;
+					type DesiredSegment =
+						| { kind: "text-run"; startIndex: number; endIndex: number }
+						| { kind: "tool"; contentIndex: number; toolId: string };
+					const desired: DesiredSegment[] = [];
+					let runStart = -1;
+					for (let i = 0; i < blocks.length; i++) {
+						const b = blocks[i];
+						const isText = b.type === "text" || b.type === "thinking";
+						const isTool = b.type === "toolCall" || b.type === "serverToolUse";
+						if (isText) {
+							if (runStart === -1) runStart = i;
+						} else {
+							if (runStart !== -1) {
+								desired.push({ kind: "text-run", startIndex: runStart, endIndex: i - 1 });
+								runStart = -1;
+							}
+							if (isTool) {
+								desired.push({ kind: "tool", contentIndex: i, toolId: b.id });
+							}
+						}
 					}
-					host.streamingComponent.updateContent(host.streamingMessage);
+					if (runStart !== -1) {
+						desired.push({ kind: "text-run", startIndex: runStart, endIndex: blocks.length - 1 });
+					}
+
+					// Append any newly needed segments (never reorder existing ones).
+					for (const seg of desired) {
+						if (seg.kind === "tool") {
+							// Tool segments are already handled above via pendingTools; just
+							// register them in renderedSegments if not yet tracked.
+							const existing = renderedSegments.find(
+								(s) => s.kind === "tool" && s.contentIndex === seg.contentIndex,
+							);
+							if (!existing) {
+								const comp = host.pendingTools.get(seg.toolId);
+								if (comp) {
+									renderedSegments.push({ kind: "tool", contentIndex: seg.contentIndex, component: comp });
+								}
+							}
+						} else {
+							// text-run segment
+							const existing = renderedSegments.find(
+								(s) => s.kind === "text-run" && s.startIndex === seg.startIndex,
+							);
+							if (!existing) {
+								const comp = new AssistantMessageComponent(
+									undefined,
+									host.hideThinkingBlock,
+									host.getMarkdownThemeWithSettings(),
+									host.settingsManager.getTimestampFormat(),
+									{ startIndex: seg.startIndex, endIndex: seg.endIndex },
+								);
+								host.chatContainer.addChild(comp);
+								renderedSegments.push({ kind: "text-run", startIndex: seg.startIndex, endIndex: seg.endIndex, component: comp });
+								host.streamingComponent = comp;
+							}
+						}
+					}
+
+					// Update all trailing text-run segments with the latest message so
+					// streaming text grows in place.
+					for (const seg of renderedSegments) {
+						if (seg.kind === "text-run") {
+							// Find corresponding desired segment to get current endIndex
+							const d = desired.find((ds) => ds.kind === "text-run" && ds.startIndex === seg.startIndex);
+							if (d && d.kind === "text-run" && d.endIndex !== seg.endIndex) {
+								seg.endIndex = d.endIndex;
+								seg.component.setRange({ startIndex: seg.startIndex, endIndex: seg.endIndex });
+							}
+							seg.component.updateContent(host.streamingMessage);
+						}
+					}
+
+					// Keep streamingComponent pointing at the last text-run for message_end compatibility.
+					const lastTextSeg = [...renderedSegments].reverse().find((s) => s.kind === "text-run");
+					if (lastTextSeg && lastTextSeg.kind === "text-run") {
+						host.streamingComponent = lastTextSeg.component;
+					}
 				}
 
 				// Update index: fully processed blocks won't need re-scanning.
@@ -376,6 +449,7 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 					host.chatContainer.addChild(host.streamingComponent);
 				}
 				if (host.streamingComponent) {
+					host.streamingComponent.setShowMetadata(true);
 					host.streamingComponent.updateContent(host.streamingMessage);
 				}
 
@@ -399,6 +473,7 @@ export async function handleAgentEvent(host: InteractiveModeStateHost & {
 				}
 				host.streamingComponent = undefined;
 				host.streamingMessage = undefined;
+				renderedSegments = [];
 				// Clear pinned output once the message is finalized in the chat
 				// container — prevents duplicate display when the agent continues
 				// (e.g. form elicitation) after the assistant message ends.
