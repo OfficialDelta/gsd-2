@@ -28,7 +28,13 @@ test("assistant-message caps thinking block height when text content is present"
 
   assert.match(
     src,
-    /if \(hasTextContent\)\s*\{\s*thinkingMarkdown\.maxLines = 8;\s*\}/s,
-    "assistant-message should cap visible thinking lines when assistant text also exists",
+    /const hasToolContent = message\.content\.some\(\(c\) => c\.type === "toolCall" \|\| c\.type === "serverToolUse"\);/,
+    "assistant-message should detect tool blocks in mixed turns",
+  );
+
+  assert.match(
+    src,
+    /if \(hasTextContent \|\| hasToolContent\)\s*\{\s*thinkingMarkdown\.maxLines = 8;\s*\}/s,
+    "assistant-message should cap visible thinking lines when assistant text exists or tool blocks are present",
   );
 });

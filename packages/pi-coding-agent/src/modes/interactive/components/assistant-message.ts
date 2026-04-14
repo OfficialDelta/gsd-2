@@ -88,6 +88,7 @@ export class AssistantMessageComponent extends Container {
 			(c) => (c.type === "text" && c.text.trim()) || (c.type === "thinking" && c.thinking.trim()),
 		);
 		const hasTextContent = message.content.some((c) => c.type === "text" && c.text.trim().length > 0);
+		const hasToolContent = message.content.some((c) => c.type === "toolCall" || c.type === "serverToolUse");
 
 		if (hasVisibleContent) {
 			this.contentContainer.addChild(new Spacer(1));
@@ -119,8 +120,9 @@ export class AssistantMessageComponent extends Container {
 						color: (text: string) => theme.fg("thinkingText", text),
 						italic: true,
 					});
-					// Keep assistant text/questions visible even when thinking traces are long.
-					if (hasTextContent) {
+					// Keep visible chat output readable when thinking traces are long.
+					// Tool-bearing turns can stream text in a later assistant message.
+					if (hasTextContent || hasToolContent) {
 						thinkingMarkdown.maxLines = 8;
 					}
 					this.contentContainer.addChild(thinkingMarkdown);
