@@ -2,7 +2,8 @@
  * Workflow MCP tools — exposes the core GSD mutation/read handlers over MCP.
  */
 
-import { isAbsolute, relative, resolve } from "node:path";
+import { realpathSync } from "node:fs";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
 
@@ -262,6 +263,22 @@ function isWithinRoot(candidatePath: string, rootPath: string): boolean {
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }
 
+/**
+ * Resolve the symlink target of `<allowedRoot>/.gsd` when it points into the
+ * external state layout (`~/.gsd/projects/<hash>/`). Returns the realpath of
+ * that target so callers can accept worktree paths that live under
+ * `<external-state>/worktrees/<MID>/`. Returns null when `.gsd` is absent or
+ * resolution fails — the caller should fall back to the direct containment
+ * check in that case.
+ */
+function resolveExternalStateRoot(allowedRoot: string): string | null {
+  try {
+    return realpathSync(join(allowedRoot, ".gsd"));
+  } catch {
+    return null;
+  }
+}
+
 function validateProjectDir(projectDir: string, env: NodeJS.ProcessEnv = process.env): string {
   if (!isAbsolute(projectDir)) {
     throw new Error(`projectDir must be an absolute path. Received: ${projectDir}`);
@@ -269,13 +286,23 @@ function validateProjectDir(projectDir: string, env: NodeJS.ProcessEnv = process
 
   const resolvedProjectDir = resolve(projectDir);
   const allowedRoot = getAllowedProjectRoot(env);
-  if (allowedRoot && !isWithinRoot(resolvedProjectDir, allowedRoot)) {
-    throw new Error(
-      `projectDir must stay within the configured workflow project root. Received: ${resolvedProjectDir}; allowed root: ${allowedRoot}`,
-    );
+  if (!allowedRoot) return resolvedProjectDir;
+
+  if (isWithinRoot(resolvedProjectDir, allowedRoot)) return resolvedProjectDir;
+
+  // External state layout: `<allowedRoot>/.gsd` may be a symlink into
+  // `~/.gsd/projects/<hash>/`, and auto-worktrees live under
+  // `~/.gsd/projects/<hash>/worktrees/<MID>/`. Accept candidates that are
+  // under the realpath of `<allowedRoot>/.gsd` — they belong to this project
+  // even though their absolute path is outside allowedRoot (#issue-a44).
+  const externalRoot = resolveExternalStateRoot(allowedRoot);
+  if (externalRoot && isWithinRoot(resolvedProjectDir, externalRoot)) {
+    return resolvedProjectDir;
   }
 
-  return resolvedProjectDir;
+  throw new Error(
+    `projectDir must stay within the configured workflow project root. Received: ${resolvedProjectDir}; allowed root: ${allowedRoot}`,
+  );
 }
 
 function parseToolArgs<T>(schema: z.ZodType<T>, args: Record<string, unknown>): T {
