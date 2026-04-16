@@ -11,6 +11,38 @@ import { TelegramAdapter } from "./telegram-adapter.js";
 import { createPromptRecord, writePromptRecord, markPromptAnswered, markPromptDispatched, markPromptStatus, updatePromptRecord } from "./store.js";
 import { sanitizeError } from "../shared/sanitize.js";
 
+const COMMAND_POLLING_INTERVAL_MS = 5000;
+
+/**
+ * Start background polling for incoming slash commands on the configured
+ * remote channel. Only Telegram supports command polling — other channels
+ * are no-ops that return an inert cleanup function immediately.
+ *
+ * @param basePath - Project root, forwarded to command handlers (e.g. /status).
+ * @param intervalMs - Polling interval in milliseconds (default 5 s).
+ * @returns A cleanup function that stops the polling interval.
+ */
+export function startCommandPolling(
+  basePath: string,
+  intervalMs = COMMAND_POLLING_INTERVAL_MS,
+): () => void {
+  const config = resolveRemoteConfig();
+  if (!config || config.channel !== "telegram") {
+    // Non-Telegram channels have no command polling support — return a no-op cleanup.
+    return () => {};
+  }
+
+  const adapter = new TelegramAdapter(config.token, config.channelId, basePath);
+
+  const timer = setInterval(() => {
+    void adapter.pollAndHandleCommands(basePath).catch(() => {
+      // Non-fatal: network hiccup or rate-limit — best-effort polling
+    });
+  }, intervalMs);
+
+  return () => clearInterval(timer);
+}
+
 interface ToolResult {
   content: Array<{ type: "text"; text: string }>;
   details?: Record<string, unknown>;
@@ -36,6 +68,7 @@ export function isRemoteConfigured(): boolean {
 export async function tryRemoteQuestions(
   questions: QuestionInput[],
   signal?: AbortSignal,
+  basePath?: string,
 ): Promise<ToolResult | null> {
   const config = resolveRemoteConfig();
   if (!config) return null;
@@ -43,7 +76,7 @@ export async function tryRemoteQuestions(
   const prompt = createPrompt(questions, config);
   writePromptRecord(createPromptRecord(prompt));
 
-  const adapter = createAdapter(config);
+  const adapter = createAdapter(config, basePath ?? process.cwd());
   try {
     await adapter.validate();
   } catch (err) {
@@ -127,9 +160,9 @@ function createPrompt(questions: QuestionInput[], config: ResolvedConfig): Remot
   };
 }
 
-function createAdapter(config: ResolvedConfig): ChannelAdapter {
+function createAdapter(config: ResolvedConfig, basePath: string): ChannelAdapter {
   if (config.channel === "slack") return new SlackAdapter(config.token, config.channelId);
-  if (config.channel === "telegram") return new TelegramAdapter(config.token, config.channelId);
+  if (config.channel === "telegram") return new TelegramAdapter(config.token, config.channelId, basePath);
   return new DiscordAdapter(config.token, config.channelId);
 }
 

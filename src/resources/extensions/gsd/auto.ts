@@ -160,6 +160,7 @@ import {
   escapeStaleWorktree,
 } from "./auto-worktree.js";
 import { pruneQueueOrder } from "./queue-order.js";
+import { startCommandPolling as _startCommandPolling, isRemoteConfigured } from "../remote-questions/manager.js";
 
 import { debugLog, isDebugEnabled, writeDebugSummary } from "./debug-logger.js";
 import {
@@ -388,6 +389,27 @@ function registerSigtermHandler(currentBasePath: string): void {
 function deregisterSigtermHandler(): void {
   _deregisterSigtermHandler(s.sigtermHandler);
   s.sigtermHandler = null;
+}
+
+/**
+ * Wrapper: start background command polling for the configured remote channel
+ * (currently Telegram only). Stores the cleanup function on the session so
+ * every exit path can stop the interval via stopCommandPolling().
+ * No-op when no remote channel is configured.
+ */
+function startAutoCommandPolling(basePath: string): void {
+  if (!isRemoteConfigured()) return;
+  // Clear any existing interval before starting a new one (e.g. resume path).
+  stopAutoCommandPolling();
+  s.commandPollingCleanup = _startCommandPolling(basePath);
+}
+
+/** Wrapper: stop background command polling and clear the stored cleanup. */
+function stopAutoCommandPolling(): void {
+  if (s.commandPollingCleanup) {
+    s.commandPollingCleanup();
+    s.commandPollingCleanup = null;
+  }
 }
 
 export { type AutoDashboardData } from "./auto-dashboard.js";
@@ -648,6 +670,7 @@ function handleLostSessionLock(
   s.paused = false;
   deactivateGSD();
   clearUnitTimeout();
+  stopAutoCommandPolling();
   restoreProjectRootEnv();
   restoreMilestoneLockEnv();
   deregisterSigtermHandler();
@@ -687,6 +710,7 @@ function cleanupAfterLoopExit(ctx: ExtensionContext): void {
   s.active = false;
   deactivateGSD();
   clearUnitTimeout();
+  stopAutoCommandPolling();
   restoreProjectRootEnv();
   restoreMilestoneLockEnv();
 
@@ -735,6 +759,7 @@ export async function stopAuto(
     // ── Step 1: Timers and locks ──
     try {
       clearUnitTimeout();
+      stopAutoCommandPolling();
       if (lockBase()) clearLock(lockBase());
       if (lockBase()) releaseSessionLock(lockBase());
     } catch (e) {
@@ -1000,6 +1025,7 @@ export async function pauseAuto(
 ): Promise<void> {
   if (!s.active) return;
   clearUnitTimeout();
+  stopAutoCommandPolling();
 
   // Flush queued follow-up messages (#3512).
   // Late async notifications (async_job_result, gsd-auto-wrapup) can trigger
@@ -1533,6 +1559,7 @@ export async function startAuto(
     logCmuxEvent(loadEffectiveGSDPreferences()?.preferences, s.stepMode ? "Step-mode resumed." : "Auto-mode resumed.", "progress");
 
     captureProjectRootEnv(s.originalBasePath || s.basePath);
+    startAutoCommandPolling(s.basePath);
     await runAutoLoopWithUok({
       ctx,
       pi,
@@ -1573,6 +1600,8 @@ export async function startAuto(
     logWarning("engine", `cmux sync failed: ${err instanceof Error ? err.message : String(err)}`, { file: "auto.ts" });
   }
   logCmuxEvent(loadEffectiveGSDPreferences()?.preferences, requestedStepMode ? "Step-mode started." : "Auto-mode started.", "progress");
+
+  startAutoCommandPolling(s.basePath);
 
   // Dispatch the first unit
   await runAutoLoopWithUok({

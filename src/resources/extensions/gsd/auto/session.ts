@@ -172,6 +172,10 @@ export class AutoSession {
   // ── Signal handler ───────────────────────────────────────────────────────
   sigtermHandler: (() => void) | null = null;
 
+  // ── Remote command polling ───────────────────────────────────────────────
+  /** Cleanup function returned by startCommandPolling(); null when not running. */
+  commandPollingCleanup: (() => void) | null = null;
+
   // ── Loop promise state ──────────────────────────────────────────────────
   // Per-unit resolve function and session-switch guard live at module level
   // in auto-loop.ts (_currentResolve, _sessionSwitchInFlight).
@@ -266,6 +270,9 @@ export class AutoSession {
 
     // Signal handler
     this.sigtermHandler = null;
+
+    // Remote command polling — cleanup must be called before reset (auto.ts stopAuto)
+    this.commandPollingCleanup = null;
 
     // Loop promise state lives in auto-loop.ts module scope
   }

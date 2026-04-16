@@ -139,6 +139,22 @@ Enable with `github.enabled: true` in preferences. Requires `gh` CLI installed a
 |---------|-------------|
 | `/worktree` (`/wt`) | Git worktree lifecycle — create, switch, merge, remove |
 
+## Telegram Commands
+
+The following commands are sent directly in your **Telegram chat** to a configured GSD bot — they are not GSD CLI commands. Telegram command polling runs every ~5 seconds while auto-mode is active. Each response is prefixed with the project name (e.g., `📁 MyProject`).
+
+| Command | Description |
+|---------|-------------|
+| `/status` | Current milestone, active unit, and session cost |
+| `/progress` | Roadmap overview — completed and open milestones |
+| `/budget` | Token usage and cost for the current session |
+| `/pause` | Pause auto-mode after the current unit finishes |
+| `/resume` | Clear a pause directive and continue auto-mode |
+| `/log [n]` | Last `n` activity log entries (default: 5) |
+| `/help` | List all available Telegram commands |
+
+**Requirements:** Telegram must be configured as your remote channel (`remote_questions.channel: telegram`). Commands are only processed while auto-mode is running. See [Remote Questions — Telegram Commands](./remote-questions.md#telegram-commands) for setup and details.
+
 ## Session Management
 
 | Command | Description |
