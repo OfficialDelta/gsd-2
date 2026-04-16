@@ -89,6 +89,8 @@ interface TrackedEvent {
   detail?: string
 }
 
+type RpcClientWithProcess = RpcClient & { process?: ChildProcess }
+
 // ---------------------------------------------------------------------------
 // Resume Session Resolution
 // ---------------------------------------------------------------------------
@@ -735,7 +737,9 @@ async function runHeadlessOnce(options: HeadlessOptions, restartCount: number): 
     // Kill child process — don't await, just fire and exit.
     // The main flow may be awaiting a promise that resolves when the child dies,
     // which would race with this handler. Exit synchronously to ensure correct exit code.
-    try { client.stop().catch(() => {}) } catch {}
+    void client.stop().catch((error: unknown) => {
+      process.stderr.write(`[headless] Warning: failed to stop child process: ${error instanceof Error ? error.message : String(error)}\n`)
+    })
     if (timeoutTimer) clearTimeout(timeoutTimer)
     if (idleTimer) clearTimeout(idleTimer)
     // Emit batch JSON result if in json mode before exiting
@@ -816,7 +820,7 @@ async function runHeadlessOnce(options: HeadlessOptions, restartCount: number): 
   }
 
   // Detect child process crash (read-only exit event subscription — not stdin access)
-  const internalProcess = (client as any).process as ChildProcess
+  const internalProcess = (client as RpcClientWithProcess).process
   if (internalProcess) {
     internalProcess.on('exit', (code) => {
       if (!completed) {

@@ -15,58 +15,21 @@ import { extractVerdict } from "./verdict-parser.js";
 import { milestoneIdSort, findMilestoneIds } from "./guided-flow.js";
 import type { RiskLevel } from "./types.js";
 import { getSliceBranchName, detectWorktreeName } from "./worktree.js";
+import type {
+  WorkspaceIndex as GSDWorkspaceIndex,
+  WorkspaceMilestoneTarget,
+  WorkspaceScopeTarget,
+  WorkspaceSliceTarget,
+  WorkspaceTaskTarget,
+} from "../../../shared/workspace-types.js";
 
-export interface WorkspaceTaskTarget {
-  id: string;
-  title: string;
-  done: boolean;
-  planPath?: string;
-  summaryPath?: string;
-}
-
-export interface WorkspaceSliceTarget {
-  id: string;
-  title: string;
-  done: boolean;
-  planPath?: string;
-  summaryPath?: string;
-  uatPath?: string;
-  tasksDir?: string;
-  branch?: string;
-  risk?: RiskLevel;
-  depends?: string[];
-  demo?: string;
-  tasks: WorkspaceTaskTarget[];
-}
-
-export interface WorkspaceMilestoneTarget {
-  id: string;
-  title: string;
-  roadmapPath?: string;
-  /** Authoritative milestone lifecycle status from the GSD state registry. */
-  status?: "complete" | "active" | "pending" | "parked";
-  /** Milestone validation verdict, when validation has been performed. */
-  validationVerdict?: "pass" | "needs-attention" | "needs-remediation";
-  slices: WorkspaceSliceTarget[];
-}
-
-export interface WorkspaceScopeTarget {
-  scope: string;
-  label: string;
-  kind: "project" | "milestone" | "slice" | "task";
-}
-
-export interface GSDWorkspaceIndex {
-  milestones: WorkspaceMilestoneTarget[];
-  active: {
-    milestoneId?: string;
-    sliceId?: string;
-    taskId?: string;
-    phase: string;
-  };
-  scopes: WorkspaceScopeTarget[];
-  validationIssues: Array<Record<string, unknown>>;
-}
+export type {
+  WorkspaceIndex as GSDWorkspaceIndex,
+  WorkspaceMilestoneTarget,
+  WorkspaceScopeTarget,
+  WorkspaceSliceTarget,
+  WorkspaceTaskTarget,
+};
 
 // Extract milestone title from roadmap header without using parsers.
 // Falls back to the milestone ID if no title line found.

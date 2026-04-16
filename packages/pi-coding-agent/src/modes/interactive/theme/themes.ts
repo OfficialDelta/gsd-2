@@ -8,9 +8,8 @@
  * To add a new built-in theme, add an entry to `builtinThemes` below.
  */
 
-// Re-use the ThemeJson type from the schema defined in theme.ts.
-// We import only the type to avoid circular runtime dependencies.
-import type { ThemeJson } from "./theme.js";
+// Re-use the ThemeJson type from the schema module to avoid runtime cycles.
+import type { ThemeJson } from "./theme-schema.js";
 
 // ---------------------------------------------------------------------------
 // Dark theme
