@@ -293,6 +293,23 @@ export const OPENROUTER_MODELS = {
 			contextWindow: 1000000,
 			maxTokens: 128000,
 		} satisfies Model<"openai-completions">,
+		"anthropic/claude-opus-4.7": {
+			id: "anthropic/claude-opus-4.7",
+			name: "Anthropic: Claude Opus 4.7",
+			api: "openai-completions",
+			provider: "openrouter",
+			baseUrl: "https://openrouter.ai/api/v1",
+			reasoning: true,
+			input: ["text", "image"],
+			cost: {
+				input: 5,
+				output: 25,
+				cacheRead: 0.5,
+				cacheWrite: 6.25,
+			},
+			contextWindow: 1000000,
+			maxTokens: 128000,
+		} satisfies Model<"openai-completions">,
 		"anthropic/claude-opus-4.6-fast": {
 			id: "anthropic/claude-opus-4.6-fast",
 			name: "Anthropic: Claude Opus 4.6 (Fast)",

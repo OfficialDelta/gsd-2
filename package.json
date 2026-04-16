@@ -97,7 +97,7 @@
     "test:live-regression": "node --experimental-strip-types tests/live-regression/run.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.73.0",
+    "@anthropic-ai/sdk": "^0.90.0",
     "@anthropic-ai/vertex-sdk": "^0.14.4",
     "@aws-sdk/client-bedrock-runtime": "^3.983.0",
     "@clack/prompts": "^1.1.0",

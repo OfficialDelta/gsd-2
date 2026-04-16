@@ -686,12 +686,14 @@ function modelSupportsAdaptiveThinking(modelId: string): boolean {
 	return (
 		modelId.includes("opus-4-6")
 		|| modelId.includes("opus-4.6")
+		|| modelId.includes("opus-4-7")
+		|| modelId.includes("opus-4.7")
 		|| modelId.includes("sonnet-4-6")
 		|| modelId.includes("sonnet-4.6")
 	);
 }
 
-function mapThinkingLevelToAnthropicEffort(level: ThinkingLevel | undefined, modelId: string): "low" | "medium" | "high" | "max" {
+function mapThinkingLevelToAnthropicEffort(level: ThinkingLevel | undefined, modelId: string): "low" | "medium" | "high" | "xhigh" | "max" {
 	switch (level) {
 		case "minimal":
 		case "low":
@@ -701,7 +703,9 @@ function mapThinkingLevelToAnthropicEffort(level: ThinkingLevel | undefined, mod
 		case "high":
 			return "high";
 		case "xhigh":
-			return modelId.includes("opus-4-6") || modelId.includes("opus-4.6") ? "max" : "high";
+			if (modelId.includes("opus-4-7") || modelId.includes("opus-4.7")) return "xhigh";
+			if (modelId.includes("opus-4-6") || modelId.includes("opus-4.6")) return "max";
+			return "high";
 		default:
 			return "high";
 	}
@@ -760,7 +764,7 @@ export function buildSdkOptions(
 		disallowedTools,
 		...(allowedTools.length > 0 ? { allowedTools } : {}),
 		...(mcpServers ? { mcpServers } : {}),
-		betas: modelId.includes("sonnet") ? ["context-1m-2025-08-07"] : [],
+		betas: (modelId.includes("sonnet") || modelId.includes("opus-4-7") || modelId.includes("opus-4.7")) ? ["context-1m-2025-08-07"] : [],
 		...(effort ? { effort } : {}),
 		...sdkExtraOptions,
 	};
