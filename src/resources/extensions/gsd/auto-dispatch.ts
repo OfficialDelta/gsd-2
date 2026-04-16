@@ -13,7 +13,7 @@ import type { GSDState } from "./types.js";
 import type { GSDPreferences } from "./preferences.js";
 import type { UatType } from "./files.js";
 import { loadFile, extractUatType, loadActiveOverrides } from "./files.js";
-import { isDbAvailable, getMilestoneSlices, getPendingGates, markAllGatesOmitted, getMilestone } from "./gsd-db.js";
+import { isDbAvailable, getMilestoneSlices, getPendingGates, markAllGatesOmitted, getMilestone, updateMilestoneStatus } from "./gsd-db.js";
 import { isClosedStatus } from "./status-guards.js";
 import { extractVerdict, isAcceptableUatVerdict } from "./verdict-parser.js";
 
@@ -765,6 +765,23 @@ export const DISPATCH_RULES: DispatchRule[] = [
         if (milestone && isClosedStatus(milestone.status)) {
           return { action: "skip" };
         }
+      }
+
+      // Reconciliation guard (#4324): when the SUMMARY file already exists
+      // on disk but the DB says the milestone is not complete, the DB is
+      // out of sync (e.g. journal reset, partial merge, crash recovery).
+      // Reconcile the DB status directly instead of re-dispatching the
+      // tool, which would overwrite the richer on-disk SUMMARY with a
+      // thinner regenerated version — causing silent data loss.
+      const existingSummary = resolveMilestoneFile(basePath, mid, "SUMMARY");
+      if (existingSummary && isDbAvailable()) {
+        try {
+          updateMilestoneStatus(mid, "complete", new Date().toISOString());
+          logWarning("dispatch", `Milestone ${mid} has SUMMARY on disk but DB status was not complete — reconciled DB to complete (#4324)`);
+        } catch (err) {
+          logWarning("dispatch", `Failed to reconcile milestone ${mid} status: ${err instanceof Error ? err.message : String(err)}`);
+        }
+        return { action: "skip" };
       }
 
       // Safety guard (#2675): block completion when VALIDATION verdict is

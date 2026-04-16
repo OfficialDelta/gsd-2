@@ -46,4 +46,22 @@ describe("completing-milestone dispatch guard (#4324)", () => {
     const dispatchIdx = source.indexOf('unitType: "complete-milestone"', skipIdx);
     assert.ok(dispatchIdx > -1, "complete-milestone dispatch should exist after the skip guard");
   });
+
+  test("imports updateMilestoneStatus for DB reconciliation", () => {
+    assert.match(source, /import\s*\{[^}]*updateMilestoneStatus[^}]*\}\s*from\s*["']\.\/gsd-db/);
+  });
+
+  test("reconciles DB when SUMMARY exists on disk but DB is out of sync", () => {
+    const phaseCheck = source.indexOf('phase !== "completing-milestone"');
+    // The SUMMARY-exists reconciliation guard must appear in this rule
+    const summaryGuard = source.indexOf('resolveMilestoneFile(basePath, mid, "SUMMARY")', phaseCheck);
+    assert.ok(summaryGuard > -1, "SUMMARY file check should exist in the completing-milestone rule");
+
+    const reconcileCall = source.indexOf('updateMilestoneStatus(mid, "complete"', summaryGuard);
+    assert.ok(reconcileCall > -1, "updateMilestoneStatus reconciliation should follow the SUMMARY check");
+
+    // Reconciliation must happen before the dispatch action
+    const dispatchIdx = source.indexOf('unitType: "complete-milestone"', reconcileCall);
+    assert.ok(dispatchIdx > -1, "reconciliation should appear before the dispatch action");
+  });
 });
