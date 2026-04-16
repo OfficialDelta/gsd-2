@@ -80,7 +80,7 @@ jobs:
             const comment = [
               botMarker,
               '',
-              'Thanks for filing this bug report!',
+              '\u{1F44B} Thanks for filing this bug report!',
               '',
               `It looks like you're running **GSD v${reportedVersion}**, but the latest release is **v${latestVersion}**.`,
               '',
@@ -96,7 +96,7 @@ jobs:
               '> **Why?** Many bugs are fixed in subsequent releases. Confirming on the latest version keeps the team focused on real, current issues.',
               '',
               '---',
-              "*This is an automated check. If you're intentionally pinned to an older version, feel free to explain why and we'll continue from there.*",
+              '*This is an automated check. If you\'re intentionally pinned to an older version, feel free to explain why and we\'ll continue from there.*',
             ].join('\n');
 
             await github.rest.issues.createComment({
